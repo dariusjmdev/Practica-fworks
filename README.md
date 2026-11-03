@@ -1,133 +1,209 @@
-# Práctica 1.1 — Primeros endpoints y estructura inicial
+# Práctica 1.2 - Modelado con Pydantic
 
-## 1. Objetivo
+## Objetivo
 
-El objetivo de esta práctica es crear una API inicial utilizando
-FastAPI, configurar el entorno de desarrollo y comprobar la
-documentación automática mediante Swagger.
+Definir los schemas de entrada y salida de la API TaskFlow utilizando Pydantic, aplicando validaciones y exponiendo un endpoint temporal que permita comprobar el correcto funcionamiento de los modelos.
 
-## 2. Estructura del proyecto
-<img width="225" height="233" alt="image" src="https://github.com/user-attachments/assets/378d4bde-89fe-412a-a0a0-be61f8406093" />
+---
 
-## 3. Entorno virtual
+## Estructura añadida
 
-Se ha creado un entorno virtual mediante:
+Se ha creado el archivo:
 
-```bash
-python -m venv venv
+```text
+app/
+└── schemas.py
 ```
-El entorno permite aislar las dependencias del proyecto.
 
-## 4. Dependencias
+Encargado de contener todos los modelos de datos (schemas) de la aplicación.
 
-Las dependencias utilizadas en el proyecto se encuentran definidas en el
-archivo `requirements.txt`.
+---
 
-Las principales dependencias son:
+## Schemas implementados
 
-- **FastAPI**: framework utilizado para desarrollar la API REST.
-- **Uvicorn**: servidor ASGI utilizado para ejecutar la aplicación FastAPI.
-- **Pydantic**: utilizado para definir y validar los modelos de respuesta.
+### TaskCreate
 
-Las dependencias se han instalado dentro del entorno virtual del proyecto
-y sus versiones se encuentran fijadas en `requirements.txt`.
+Schema utilizado para recibir datos al crear una tarea.
 
-## 5. Endpoints
+Campos:
 
-La aplicación dispone de tres endpoints funcionales:
+- `title: str`
+- `description: str | None`
+- `project_id: int`
 
-### GET /health
+Validación aplicada:
 
-Este endpoint permite comprobar el estado de la API.
+```python
+title: str = Field(
+    min_length=1,
+    max_length=100
+)
+```
 
-**Respuesta:**
+Restricciones:
+
+- El título no puede estar vacío.
+- El título no puede superar los 100 caracteres.
+
+---
+
+### TaskRead
+
+Schema utilizado para devolver información de una tarea.
+
+Campos:
+
+- `id: int`
+- `title: str`
+- `description: str | None`
+- `project_id: int`
+- `completed: bool`
+- `created_at: datetime`
+
+---
+
+### ProjectCreate
+
+Schema utilizado para la creación de proyectos.
+
+Campos:
+
+- `name: str`
+- `description: str`
+
+---
+
+### ProjectRead
+
+Schema utilizado para devolver información de proyectos.
+
+Campos:
+
+- `id: int`
+- `name: str`
+- `description: str`
+- `created_at: datetime`
+
+---
+
+## Endpoint temporal implementado
+
+Se ha añadido el endpoint:
+
+```http
+POST /tasks
+```
+
+Configuración:
+
+```python
+@app.post(
+    "/tasks",
+    response_model=TaskRead,
+    status_code=201
+)
+```
+
+### Entrada
+
+Recibe un objeto del tipo:
 
 ```json
 {
-  "status": "ok"
+  "title": "Primera tarea",
+  "description": "Descripción de prueba",
+  "project_id": 1
 }
 ```
-La aplicación dispone de tres endpoints funcionales:
 
-### GET /health
+### Salida
 
-Este endpoint permite comprobar el estado de la API.
-
-
-**Respuesta:**
+Devuelve un objeto del tipo:
 
 ```json
 {
-  "status": "ok"
+  "id": 1,
+  "title": "Primera tarea",
+  "description": "Descripción de prueba",
+  "project_id": 1,
+  "completed": false,
+  "created_at": "2026-11-03T15:00:00"
 }
 ```
 
-### GET /version
+---
 
-Este endpoint devuelve la versión actual de la API.
+## Validación de datos
 
-**respuesta**
+### Caso válido
+
+Petición:
 
 ```json
 {
-"status": "ok"
+  "title": "Caso de prueba",
+  "description": "Descripción de prueba",
+  "project_id": 1
 }
 ```
-### GET /ping
-Este endpoint permite comprobar que el servidor está respondiendo
-correctamente.
-**respuesta**
-``` json
+
+Resultado:
+
+![alt text](<Captura de pantalla 2026-11-03 173206.png>)
+
+---
+
+### Caso inválido
+
+Petición:
+
+```json
 {
-"message": "pong"
+  "title": "",
+  "description": "Descripción de prueba",
+  "project_id": 1
 }
 ```
-Los tres endpoints están documentados mediante summary, description
-y response_model, por lo que aparecen correctamente definidos en la
-documentación automática de Swagger (/docs).
-## 6. Ejecución del servidor
 
-Para iniciar el servidor de la aplicación se utiliza Uvicorn.
+Resultado:
 
-En primer lugar, se activa el entorno virtual del proyecto:
+![alt text](image.png)
+
+---
+
+## Ejecución del proyecto
+
+Activación del entorno virtual:
 
 ```bash
 venv\Scripts\activate
 ```
 
-A continuación, se inicia el servidor mediante el siguiente comando:
+Arranque del servidor:
 
 ```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
-La opción `--reload` permite que el servidor se reinicie automáticamente cuando se realizan cambios en el código durante el desarrollo.
-
-Una vez iniciado correctamente el servidor, la API queda disponible en:
-
-```text
-http://127.0.0.1:8000
-```
-
-La documentación automática de Swagger puede consultarse en:
+Acceso a la documentación Swagger:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-Desde Swagger se pueden consultar y probar los tres endpoints implementados:
+---
 
-- `GET /health`
-- `GET /version`
-- `GET /ping`
+## Concepto de Schema
 
-## 7. Documentación Swagger
+Un schema define el contrato de entrada y salida de la API.
 
-<img width="225" height="253" alt="image" src="https://github.com/user-attachments/assets/88fadff3-85ef-4233-ab02-77ec8169d057"/>
+Permite:
 
-La documentación automática permite consultar y probar los endpoints
-de la API.
+- Validar datos recibidos.
+- Documentar automáticamente la API.
+- Garantizar los tipos de datos.
+- Generar modelos visibles en Swagger.
 
-## 8. Control de versiones
-El proyecto se ha gestionado mediante Git utilizando commits
-descriptivos y separados por cambios funcionales.
+Los schemas no representan tablas de base de datos, sino la información que intercambia la API con los clientes.
+
+---
