@@ -1,159 +1,169 @@
-# Práctica 1.2 - Modelado con Pydantic
+# Práctica 1.3 - Organización con APIRouter
 
 ## Objetivo
 
-Definir los schemas de entrada y salida de la API TaskFlow utilizando Pydantic, aplicando validaciones y exponiendo un endpoint temporal que permita comprobar el correcto funcionamiento de los modelos.
+Reorganizar la aplicación FastAPI utilizando `APIRouter` para separar los endpoints por recursos y mejorar la mantenibilidad del proyecto.
+
+La práctica tiene como finalidad eliminar la lógica de negocio de `main.py` y distribuir las rutas en módulos independientes, agrupados según el recurso al que pertenecen.
 
 ---
 
-## Estructura añadida
-
-Se ha creado el archivo:
+# Arquitectura del proyecto
 
 ```text
 app/
-└── schemas.py
+├── __init__.py
+├── main.py
+├── schemas.py
+│
+└── routers/
+    ├── __init__.py
+    ├── tasks.py
+    └── projects.py
 ```
 
-Encargado de contener todos los modelos de datos (schemas) de la aplicación.
+## Descripción de cada componente
+
+### main.py
+
+Punto de entrada de la aplicación.
+
+Responsabilidades:
+
+- Crear la instancia de FastAPI.
+- Configurar metadatos de la API.
+- Registrar los routers mediante `include_router()`.
+
+No contiene lógica de negocio ni implementación de endpoints.
 
 ---
 
-## Schemas implementados
+### schemas.py
 
-### TaskCreate
+Contiene los modelos Pydantic utilizados como contrato de entrada y salida de la API.
 
-Schema utilizado para recibir datos al crear una tarea.
+Schemas implementados:
 
-Campos:
+- TaskCreate
+- TaskRead
+- ProjectCreate
+- ProjectRead
 
-- `title: str`
-- `description: str | None`
-- `project_id: int`
-
-Validación aplicada:
+Además, mantiene la validación definida en la práctica anterior:
 
 ```python
-title: str = Field(
-    min_length=1,
-    max_length=100
+Field(min_length=1, max_length=100)
+```
+
+para el campo `title`.
+
+---
+
+### routers/tasks.py
+
+Contiene todos los endpoints relacionados con tareas.
+
+Configuración:
+
+```python
+APIRouter(
+    prefix="/tasks",
+    tags=["tasks"]
 )
 ```
 
-Restricciones:
-
-- El título no puede estar vacío.
-- El título no puede superar los 100 caracteres.
-
----
-
-### TaskRead
-
-Schema utilizado para devolver información de una tarea.
-
-Campos:
-
-- `id: int`
-- `title: str`
-- `description: str | None`
-- `project_id: int`
-- `completed: bool`
-- `created_at: datetime`
-
----
-
-### ProjectCreate
-
-Schema utilizado para la creación de proyectos.
-
-Campos:
-
-- `name: str`
-- `description: str`
-
----
-
-### ProjectRead
-
-Schema utilizado para devolver información de proyectos.
-
-Campos:
-
-- `id: int`
-- `name: str`
-- `description: str`
-- `created_at: datetime`
-
----
-
-## Endpoint temporal implementado
-
-Se ha añadido el endpoint:
+Endpoint implementado:
 
 ```http
 POST /tasks
 ```
 
+---
+
+### routers/projects.py
+
+Contiene todos los endpoints relacionados con proyectos.
+
 Configuración:
 
 ```python
-@app.post(
-    "/tasks",
-    response_model=TaskRead,
-    status_code=201
+APIRouter(
+    prefix="/projects",
+    tags=["projects"]
 )
 ```
 
-### Entrada
+Endpoint implementado:
 
-Recibe un objeto del tipo:
-
-```json
-{
-  "title": "Primera tarea",
-  "description": "Descripción de prueba",
-  "project_id": 1
-}
-```
-
-### Salida
-
-Devuelve un objeto del tipo:
-
-```json
-{
-  "id": 1,
-  "title": "Primera tarea",
-  "description": "Descripción de prueba",
-  "project_id": 1,
-  "completed": false,
-  "created_at": "2026-11-03T15:00:00"
-}
+```http
+POST /projects
 ```
 
 ---
 
-## Validación de datos
+# Beneficios de utilizar APIRouter
 
-### Caso válido
+La división por routers aporta varias ventajas:
+
+- Separación clara de responsabilidades.
+- Mayor facilidad de mantenimiento.
+- Mejor escalabilidad para futuras funcionalidades.
+- Código más legible y organizado.
+- Posibilidad de trabajar en distintos recursos de forma independiente.
+
+Sin esta organización, todos los endpoints crecerían dentro de un único archivo (`main.py`), generando un diseño monolítico difícil de mantener.
+
+---
+
+# Registro de routers
+
+Los routers se registran desde `main.py`:
+
+```python
+app.include_router(tasks_router)
+app.include_router(projects_router)
+```
+
+De esta forma FastAPI incorpora automáticamente todas las rutas al iniciar la aplicación.
+
+---
+
+# Convención REST utilizada
+
+Se ha adoptado una nomenclatura basada en recursos utilizando nombres en plural.
+
+| Recurso | URL |
+|----------|----------|
+| Tasks | `/tasks` |
+| Projects | `/projects` |
+
+Esta convención mejora la consistencia y la claridad de la API.
+
+---
+
+# Pruebas realizadas
+
+## Creación de tarea válida
 
 Petición:
 
 ```json
 {
-  "title": "Caso de prueba",
+  "title": "Mi primera tarea",
   "description": "Descripción de prueba",
   "project_id": 1
 }
 ```
 
-Resultado:
+Resultado esperado:
 
-![alt text](<Captura de pantalla 2026-11-03 173206.png>)
+```http
+201 Created
+```
 
 ---
 
-### Caso inválido
+## Validación de título vacío
 
 Petición:
 
@@ -165,45 +175,68 @@ Petición:
 }
 ```
 
-Resultado:
+Resultado esperado:
 
-![alt text](image.png)
+```http
+422 Unprocessable Entity
+```
+
+Se verifica que continúa funcionando la validación implementada en la práctica 1.2.
 
 ---
 
-## Ejecución del proyecto
+## Creación de proyecto válida
 
-Activación del entorno virtual:
+Petición:
 
-```bash
-venv\Scripts\activate
+```json
+{
+  "name": "Proyecto API",
+  "description": "Proyecto de prueba"
+}
 ```
 
-Arranque del servidor:
+Resultado esperado:
 
-```bash
-python -m uvicorn app.main:app --reload
-```
-
-Acceso a la documentación Swagger:
-
-```text
-http://127.0.0.1:8000/docs
+```http
+201 Created
 ```
 
 ---
 
-## Concepto de Schema
+# Evidencias (capturas)
 
-Un schema define el contrato de entrada y salida de la API.
+## Captura 1 - Estructura del proyecto
 
-Permite:
+"Captura 1 (la añadire en el commit 2)"
 
-- Validar datos recibidos.
-- Documentar automáticamente la API.
-- Garantizar los tipos de datos.
-- Generar modelos visibles en Swagger.
+---
 
-Los schemas no representan tablas de base de datos, sino la información que intercambia la API con los clientes.
+## Captura 2 - Swagger agrupado por tags
+
+"Captura 2 (la añadire en el commit 2)"
+
+---
+
+## Captura 3 - Endpoint POST /tasks
+
+"Captura 3 (la añadire en el commit 2)"
+
+---
+
+## Captura 4 - Endpoint POST /projects
+
+"Captura 4 (la añadire en el commit 2)"
+---
+
+## Captura 5 - Creación de tarea válida
+
+"Captura 5 (la añadire en el commit 2)"
+
+---
+
+## Captura 6 - Error de validación
+
+"Captura 6 (la añadire en el commit 2)"
 
 ---
