@@ -208,35 +208,41 @@ Resultado esperado:
 
 ## Captura 1 - Estructura del proyecto
 
-"Captura 1 (la añadire en el commit 2)"
+<img width="227" height="397" alt="Captura de pantalla 2026-11-05 115101" src="https://github.com/user-attachments/assets/69e73f93-375d-4da4-82e4-8971f42e7338" />
+
 
 ---
 
 ## Captura 2 - Swagger agrupado por tags
 
-"Captura 2 (la añadire en el commit 2)"
+<img width="897" height="412" alt="image" src="https://github.com/user-attachments/assets/8318d0e4-5d71-4ceb-ae3e-73449d8dc222" />
+
 
 ---
 
 ## Captura 3 - Endpoint POST /tasks
 
-"Captura 3 (la añadire en el commit 2)"
+<img width="877" height="773" alt="image" src="https://github.com/user-attachments/assets/a847e5bf-472b-4a61-98a5-da3b9106fdb8" />
+
 
 ---
 
 ## Captura 4 - Endpoint POST /projects
 
-"Captura 4 (la añadire en el commit 2)"
+<img width="876" height="728" alt="image" src="https://github.com/user-attachments/assets/781ffba7-1773-4632-9804-52cd483e877c" />
+
 ---
 
 ## Captura 5 - Creación de tarea válida
 
-"Captura 5 (la añadire en el commit 2)"
+<img width="862" height="277" alt="image" src="https://github.com/user-attachments/assets/b444ad97-1b7c-4247-b612-7c5591eb7e67" />
+
 
 ---
 
 ## Captura 6 - Error de validación
 
-"Captura 6 (la añadire en el commit 2)"
+<img width="868" height="367" alt="image" src="https://github.com/user-attachments/assets/8b223fc7-2f7f-4c8e-93e6-8ce6065e55f4" />
+
 
 ---
