@@ -1,61 +1,62 @@
-from datetime import datetime
+import os
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers.tasks import router as tasks_router
+from app.middleware import (
+    ErrorHandlingMiddleware,
+    RequestContextMiddleware,
+    global_exception_handler,
+)
 from app.routers.projects import router as projects_router
-
-from app.schemas import TaskCreate, TaskRead
+from app.routers.system import router as system_router
+from app.routers.tasks import router as tasks_router
 
 
 app = FastAPI(
     title="TaskFlow API",
     description="API inicial del proyecto TaskFlow.",
-    version="1.0.0"
+    version="1.0.0",
+    debug=False,
 )
 
+
+# Registra el manejador global de errores no controlados.
+app.add_exception_handler(Exception, global_exception_handler)
+
+
+# Captura los errores de los endpoints y genera una respuesta segura.
+app.add_middleware(ErrorHandlingMiddleware)
+
+
+# Permite configurar los orígenes según el entorno.
+# Por defecto, solo se permite el frontend local indicado en el enunciado.
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173",
+    ).split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    # Permite al frontend leer estas cabeceras desde JavaScript.
+    expose_headers=["X-Process-Time", "X-Request-ID"],
+)
+
+
+# Se añade el último para que sea el primero en recibir la petición
+# y pueda añadir sus cabeceras también a las respuestas de error.
+app.add_middleware(RequestContextMiddleware)
+
+
+# Registro de rutas.
+app.include_router(system_router)
 app.include_router(tasks_router)
 app.include_router(projects_router)
-
-class HealthResponse(BaseModel):
-    status: str
-
-
-class VersionResponse(BaseModel):
-    version: str
-
-
-class PingResponse(BaseModel):
-    message: str
-
-
-@app.get(
-    "/health",
-    summary="Comprobar el estado de la API",
-    description="Devuelve el estado actual del servicio.",
-    response_model=HealthResponse
-)
-def health() -> HealthResponse:
-    return {"status": "ok"}
-
-
-@app.get(
-    "/version",
-    summary="Consultar la versión de la API",
-    description="Devuelve la versión actual de TaskFlow API.",
-    response_model=VersionResponse
-)
-def version() -> VersionResponse:
-    return {"version": "1.0.0"}
-
-
-@app.get(
-    "/ping",
-    summary="Comprobar conectividad",
-    description="Endpoint sencillo para comprobar que la API responde correctamente.",
-    response_model=PingResponse
-)
-def ping() -> PingResponse:
-    return {"message": "pong"}
-
