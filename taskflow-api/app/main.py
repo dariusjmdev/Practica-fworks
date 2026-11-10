@@ -1,5 +1,8 @@
 import os
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,13 +14,28 @@ from app.middleware import (
 from app.routers.projects import router as projects_router
 from app.routers.system import router as system_router
 from app.routers.tasks import router as tasks_router
+from app.database import Base, engine
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Prepara SQLite al arrancar y livera conexiones al apagar."""
 
+    # Los routers ya han importado models.py, así que Base conoce las tablas
+    #create_all() crea las que falten en la base de datos. No borra las existentes.
+    Base.metadata.create_all(bind=engine)
+
+    try:
+        yield
+    finally:
+        engine.dispose()
+
+    
 app = FastAPI(
     title="TaskFlow API",
     description="API inicial del proyecto TaskFlow.",
     version="1.0.0",
     debug=False,
+    lifespan=lifespan
 )
 
 

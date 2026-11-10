@@ -1,7 +1,11 @@
-from datetime import datetime 
+from typing import Annotated
 
-from fastapi import APIRouter
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import Task, Project, Category
 from app.schemas import TaskCreate, TaskRead
 
 router = APIRouter( 
@@ -9,6 +13,24 @@ router = APIRouter(
     tags=["tasks"]
 )
 
+def validate_task_references(
+        task: TaskCreate,
+        db: Annotated[Session, Depends(get_db)]
+)-> TaskCreate:
+
+    if task.project_id is not None and db.get(Project, task.project_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"El proyecto no existe."
+        )
+
+    if task.category_id is not None and db.get(Category, task.category_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"La categoría no existe."
+        )
+
+    return task 
 
 @router.post(
     "",
@@ -16,12 +38,19 @@ router = APIRouter(
     status_code=201,
     summary="Crear tarea"
 )
-def create_task(task: TaskCreate) -> TaskRead:
-    return TaskRead(
-        id=1,
+def create_task(
+    task: Annotated[TaskCreate, Depends(validate_task_references)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TaskRead:
+    record = Task(
         title=task.title,
         description=task.description,
         project_id=task.project_id,
-        completed=False,
-        created_at=datetime.now()
+        category_id=task.category_id  
+    )
+    db.add(record)
+    db.commit()
+    return TaskRead.model_validate(
+        record,
+        from_attributes=True
     )

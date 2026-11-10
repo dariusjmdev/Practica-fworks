@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-router = APIRouter(tags=["system"])
+from app.database import get_db
+
+router = APIRouter(tags=["system"], dependencies=[Depends(get_db)])
 
 class HealthResponse(BaseModel):
     status: str

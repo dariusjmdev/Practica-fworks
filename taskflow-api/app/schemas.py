@@ -10,7 +10,8 @@ class TaskCreate(BaseModel):
     )
 
     description: str | None = None
-    project_id: int
+    project_id: int | None = None
+    category_id: int | None = None
 
 class TaskRead(TaskCreate):
     """Schema para leer tareas."""
@@ -20,10 +21,10 @@ class TaskRead(TaskCreate):
     
 class ProjectCreate(BaseModel):
     """Schema para crear proyectos."""
-    name: str 
-    description: str 
+    name: str = Field(min_length=1)
+    description: str | None = None
 
-class ProjectRead(ProjectCreate):
+class ProjectRead(ProjectCreate): 
     """Schema para leer proyectos."""
     id: int
     created_at: datetime

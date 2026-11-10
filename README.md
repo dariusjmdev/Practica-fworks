@@ -1,242 +1,251 @@
-# Práctica 1.3 - Organización con APIRouter
+# Práctica 1.4 — Middleware
 
 ## Objetivo
 
-Reorganizar la aplicación FastAPI utilizando `APIRouter` para separar los endpoints por recursos y mejorar la mantenibilidad del proyecto.
+En esta práctica se amplía la API de TaskFlow para añadir funcionalidades que se aplican de forma común a las peticiones y respuestas:
 
-La práctica tiene como finalidad eliminar la lógica de negocio de `main.py` y distribuir las rutas en módulos independientes, agrupados según el recurso al que pertenecen.
+- Configuración de CORS para permitir el acceso desde el frontend.
+- Medición del tiempo de procesamiento de cada petición.
+- Identificación de las peticiones mediante un `request_id`.
+- Gestión global de errores inesperados.
+
+Además, se han trasladado los endpoints `/health`, `/version` y `/ping` a un router propio, siguiendo la indicación recibida en la práctica anterior.
 
 ---
 
-# Arquitectura del proyecto
+## Estructura del proyecto
 
 ```text
-app/
-├── __init__.py
-├── main.py
-├── schemas.py
+taskflow-api/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── middleware.py
+│   ├── schemas.py
+│   │
+│   └── routers/
+│       ├── __init__.py
+│       ├── system.py
+│       ├── tasks.py
+│       └── projects.py
 │
-└── routers/
-    ├── __init__.py
-    ├── tasks.py
-    └── projects.py
+└── requirements.txt
+
+README.md
 ```
 
-## Descripción de cada componente
+### Responsabilidad de cada archivo
 
-### main.py
-
-Punto de entrada de la aplicación.
-
-Responsabilidades:
-
-- Crear la instancia de FastAPI.
-- Configurar metadatos de la API.
-- Registrar los routers mediante `include_router()`.
-
-No contiene lógica de negocio ni implementación de endpoints.
+| Archivo | Responsabilidad |
+|---|---|
+| `main.py` | Crea la aplicación, configura los middleware y registra los routers. |
+| `middleware.py` | Contiene la medición del tiempo, la identificación de las peticiones y la gestión de errores inesperados. |
+| `routers/system.py` | Agrupa los endpoints `/health`, `/version` y `/ping`. |
+| `routers/tasks.py` | Agrupa los endpoints relacionados con las tareas. |
+| `routers/projects.py` | Agrupa los endpoints relacionados con los proyectos. |
+| `schemas.py` | Define los modelos de entrada y salida de tareas y proyectos. |
 
 ---
 
-### schemas.py
+## ¿Qué es un middleware?
 
-Contiene los modelos Pydantic utilizados como contrato de entrada y salida de la API.
+Un middleware es una capa que interviene en el recorrido de una petición HTTP. Puede ejecutar acciones antes de que la petición llegue al endpoint y también modificar o completar la respuesta antes de que llegue al cliente.
 
-Schemas implementados:
+Permite aplicar un comportamiento común a varias rutas sin tener que repetirlo en cada endpoint.
 
-- TaskCreate
-- TaskRead
-- ProjectCreate
-- ProjectRead
+En esta práctica se utiliza para configurar CORS, medir el tiempo, identificar las peticiones y gestionar errores inesperados.
 
-Además, mantiene la validación definida en la práctica anterior:
+---
+
+## Configuración de CORS
+
+Se ha configurado `CORSMiddleware` para permitir por defecto las peticiones desde:
+
+```text
+http://localhost:5173
+```
+
+Este es el origen del frontend indicado en el enunciado.
+
+La configuración permite los métodos `GET`, `POST` y `OPTIONS`, y las cabeceras de petición `Content-Type` y `Authorization`.
+
+Los orígenes se pueden configurar mediante la variable de entorno `ALLOWED_ORIGINS`. Para indicar varios orígenes, se separan mediante comas.
+
+Ejemplo en PowerShell:
+
+```powershell
+$env:ALLOWED_ORIGINS = "http://localhost:5173,https://frontend.ejemplo.com"
+uvicorn app.main:app --reload
+```
+
+El dominio `frontend.ejemplo.com` es únicamente ilustrativo; debe sustituirse por el origen real si se necesita.
+
+También se ha configurado:
 
 ```python
-Field(min_length=1, max_length=100)
+expose_headers=["X-Process-Time", "X-Request-ID"]
 ```
 
-para el campo `title`.
+Esto permite que un frontend autorizado pueda leer esas cabeceras desde JavaScript en peticiones entre distintos orígenes.
+
+> CORS es una política aplicada por los navegadores. Herramientas como Postman o `curl` pueden enviar peticiones aunque el origen no esté autorizado.
 
 ---
 
-### routers/tasks.py
+## Medición del tiempo de procesamiento
 
-Contiene todos los endpoints relacionados con tareas.
+El middleware `RequestContextMiddleware` utiliza `perf_counter()` para medir el tiempo transcurrido durante el procesamiento de la petición.
 
-Configuración:
+El resultado se añade a la respuesta mediante la cabecera:
 
-```python
-APIRouter(
-    prefix="/tasks",
-    tags=["tasks"]
-)
+```text
+X-Process-Time: 5.40 ms
 ```
 
-Endpoint implementado:
+El valor se expresa en milisegundos y cambia en cada petición.
 
-```http
-POST /tasks
-```
+Esta medición llega hasta que la aplicación comienza a devolver la respuesta. En respuestas de tipo streaming, no mide necesariamente el tiempo de envío completo.
 
 ---
 
-### routers/projects.py
+## Identificador de petición
 
-Contiene todos los endpoints relacionados con proyectos.
+Cada petición recibe un identificador generado con `uuid4()`. Se devuelve en la cabecera:
 
-Configuración:
-
-```python
-APIRouter(
-    prefix="/projects",
-    tags=["projects"]
-)
+```text
+X-Request-ID: identificador-unico
 ```
 
-Endpoint implementado:
-
-```http
-POST /projects
-```
+El identificador también se guarda en el estado de la petición. Si ocurre un error, se incluye en el registro del servidor para facilitar la relación entre la respuesta recibida y el error registrado.
 
 ---
 
-# Beneficios de utilizar APIRouter
+## Gestión de errores inesperados
 
-La división por routers aporta varias ventajas:
+Se ha registrado un manejador global de excepciones. Además, `ErrorHandlingMiddleware` captura los errores inesperados de las capas interiores y utiliza ese mismo manejador para generar la respuesta.
 
-- Separación clara de responsabilidades.
-- Mayor facilidad de mantenimiento.
-- Mejor escalabilidad para futuras funcionalidades.
-- Código más legible y organizado.
-- Posibilidad de trabajar en distintos recursos de forma independiente.
+Cuando ocurre un error no controlado:
 
-Sin esta organización, todos los endpoints crecerían dentro de un único archivo (`main.py`), generando un diseño monolítico difícil de mantener.
+1. Se registra el error con sus detalles en el servidor.
+2. Se devuelve al cliente el estado `500 Internal Server Error`.
+3. Se muestra un mensaje genérico sin exponer el stacktrace.
+4. Se añade un `error_code` para identificar el tipo de error.
 
----
-
-# Registro de routers
-
-Los routers se registran desde `main.py`:
-
-```python
-app.include_router(tasks_router)
-app.include_router(projects_router)
-```
-
-De esta forma FastAPI incorpora automáticamente todas las rutas al iniciar la aplicación.
-
----
-
-# Convención REST utilizada
-
-Se ha adoptado una nomenclatura basada en recursos utilizando nombres en plural.
-
-| Recurso | URL |
-|----------|----------|
-| Tasks | `/tasks` |
-| Projects | `/projects` |
-
-Esta convención mejora la consistencia y la claridad de la API.
-
----
-
-# Pruebas realizadas
-
-## Creación de tarea válida
-
-Petición:
+Ejemplo de respuesta:
 
 ```json
 {
-  "title": "Mi primera tarea",
-  "description": "Descripción de prueba",
-  "project_id": 1
+  "error": "Se ha producido un error interno en el servidor.",
+  "error_code": "INTERNAL_SERVER_ERROR"
 }
 ```
 
-Resultado esperado:
+Los detalles de la excepción se mantienen en los registros del servidor para poder investigar el problema.
 
-```http
-201 Created
+---
+
+## Orden de ejecución
+
+Los middleware se añaden en `main.py` teniendo en cuenta que la última capa registrada es la primera que recibe la petición.
+
+El recorrido de una petición es:
+
+1. **`RequestContextMiddleware`**: inicia la medición y genera el identificador.
+2. **`CORSMiddleware`**: comprueba el origen y aplica las cabeceras CORS correspondientes.
+3. **`ErrorHandlingMiddleware`**: captura errores inesperados de las capas interiores.
+4. **Endpoint**: procesa la petición.
+
+La respuesta vuelve atravesando las capas en sentido inverso.
+
+Si un endpoint produce un error, `ErrorHandlingMiddleware` llama al manejador, que registra la excepción y genera la respuesta 500. Después, las capas exteriores pueden añadir sus cabeceras a esa respuesta.
+
+---
+
+## Pruebas realizadas
+
+### 1. Comprobación de rutas y cabeceras
+
+Se ha ejecutado `GET /ping` desde Swagger.
+
+**Resultado obtenido:**
+
+- Estado `200 OK`.
+- Respuesta `{"message": "pong"}`.
+- Cabecera `X-Process-Time`.
+- Cabecera `X-Request-ID`.
+
+**Captura 1:** respuesta de `/ping` en Swagger, incluyendo el código 200, el cuerpo y las cabeceras.
+
+<!-- INSERTAR AQUÍ LA CAPTURA 1 -->
+
+---
+
+### 2. CORS con origen permitido
+
+Se ha realizado una petición preflight con el origen permitido:
+
+```powershell
+curl.exe -i -X OPTIONS http://127.0.0.1:8000/ping -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: GET"
 ```
 
+**Resultado obtenido:**
+
+- Estado `200 OK`.
+- Cabecera `access-control-allow-origin: http://localhost:5173`.
+- Presencia de `X-Process-Time` y `X-Request-ID`.
+
+**Captura 2:** comando ejecutado y respuesta completa en la terminal.
+
+<!-- INSERTAR AQUÍ LA CAPTURA 2 -->
+
 ---
 
-## Validación de título vacío
+### 3. CORS con origen no permitido
 
-Petición:
+Se ha repetido la petición con un origen no autorizado:
 
-```json
-{
-  "title": "",
-  "description": "Descripción de prueba",
-  "project_id": 1
-}
+```powershell
+curl.exe -i -X OPTIONS http://127.0.0.1:8000/ping -H "Origin: http://ejemplo-no-permitido.com" -H "Access-Control-Request-Method: GET"
 ```
 
-Resultado esperado:
+**Resultado obtenido:**
 
-```http
-422 Unprocessable Entity
+- Estado `400 Bad Request`.
+- Mensaje `Disallowed CORS origin`.
+- El origen no aparece autorizado en `access-control-allow-origin`.
+- Las cabeceras de tiempo e identificador siguen presentes.
+
+**Captura 3:** comando ejecutado y respuesta completa en la terminal.
+
+<!-- INSERTAR AQUÍ LA CAPTURA 3 -->
+
+---
+
+### 4. Error inesperado
+
+Para comprobar el manejo de excepciones, se ha creado temporalmente una ruta que provoca un error:
+
+```python
+@router.get("/test-error", include_in_schema=False)
+def test_error():
+    raise RuntimeError("Error interno de prueba")
 ```
 
-Se verifica que continúa funcionando la validación implementada en la práctica 1.2.
+Se ha realizado la siguiente petición:
 
----
-
-## Creación de proyecto válida
-
-Petición:
-
-```json
-{
-  "name": "Proyecto API",
-  "description": "Proyecto de prueba"
-}
+```powershell
+curl.exe -i http://127.0.0.1:8000/test-error
 ```
 
-Resultado esperado:
+**Resultado obtenido:**
 
-```http
-201 Created
-```
+- Estado `500 Internal Server Error`.
+- Respuesta JSON con mensaje genérico y `error_code`.
+- El stacktrace no aparece en la respuesta del cliente.
+- Se incluyen `X-Process-Time` y `X-Request-ID`.
 
----
+**Captura 4:** respuesta 500 en la terminal, mostrando el JSON y las cabeceras.
 
-# Evidencias (capturas)
-
-## Captura 1 - Estructura del proyecto
-
-"Captura 1 (la añadire en el commit 2)"
-
----
-
-## Captura 2 - Swagger agrupado por tags
-
-"Captura 2 (la añadire en el commit 2)"
-
----
-
-## Captura 3 - Endpoint POST /tasks
-
-"Captura 3 (la añadire en el commit 2)"
-
----
-
-## Captura 4 - Endpoint POST /projects
-
-"Captura 4 (la añadire en el commit 2)"
----
-
-## Captura 5 - Creación de tarea válida
-
-"Captura 5 (la añadire en el commit 2)"
-
----
-
-## Captura 6 - Error de validación
-
-"Captura 6 (la añadire en el commit 2)"
+<!-- INSERTAR AQUÍ LA CAPTURA 4 -->
 
 ---

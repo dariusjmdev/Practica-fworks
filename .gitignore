@@ -1,0 +1,21 @@
+# Caché y bytecode de Python
+__pycache__/
+*.py[cod]
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Caché de pruebas y análisis
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Configuración local
+.env
+.env.*
+!.env.example
+
+# Base de datos local de TaskFlow y archivos auxiliares
+/taskflow-api/taskflow.db
+/taskflow-api/taskflow.db-*
