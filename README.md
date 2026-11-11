@@ -41,30 +41,6 @@ taskflow-api/
 
 ---
 
-## Puesta en marcha
-
-Desde la carpeta `taskflow-api`, con el entorno virtual activado, instalar las dependencias:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-Arrancar la aplicación:
-
-```powershell
-python -m uvicorn app.main:app --reload
-```
-
-La documentación interactiva estará disponible en:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-Al arrancar, `Base.metadata.create_all()` crea las tablas que falten en la base de datos inicial. Este método **no modifica las tablas existentes** si cambia su definición. Los cambios posteriores del esquema requieren migraciones.
-
----
-
 ## SQLAlchemy y el ORM
 
 Un ORM permite trabajar con tablas de una base de datos mediante clases y objetos de Python.
@@ -184,15 +160,14 @@ En Swagger, ejecutar `POST /projects` con:
 
 ```json
 {
-  "name": "Proyecto de prueba 1.5"
+  "name": "Proyecto de prueba"
 }
 ```
 
 **Resultado esperado:** `201 Created`, con un identificador generado, la descripción y la fecha de creación.
 
-**Captura 1:** petición y respuesta de Swagger, incluyendo el código `201` y el `id` del proyecto.
+<img width="1300" height="315" alt="image" src="https://github.com/user-attachments/assets/2f73e5ca-fb92-41b9-8215-66d924931818" />
 
-<!-- INSERTAR AQUÍ LA CAPTURA 1 -->
 
 ---
 
@@ -209,9 +184,8 @@ Ejecutar `POST /tasks` con el identificador obtenido en la prueba anterior. El s
 
 **Resultado esperado:** `201 Created`, con el `project_id` indicado y `completed: false`.
 
-**Captura 2:** petición y respuesta de Swagger, mostrando el código `201`, el ID de la tarea y su `project_id`.
+<img width="1303" height="317" alt="image" src="https://github.com/user-attachments/assets/d45f1101-cb46-4dd3-8a9d-2a4e049e66b7" />
 
-<!-- INSERTAR AQUÍ LA CAPTURA 2 -->
 
 ---
 
@@ -239,9 +213,9 @@ Para comprobar una categoría inexistente, ejecutar por separado:
 
 **Resultado esperado:** `404` con `La categoría no existe`.
 
-**Capturas 3 y 4:** respuestas de Swagger para cada prueba, mostrando el JSON enviado, el código `404` y el mensaje correspondiente.
+<img width="1302" height="308" alt="image" src="https://github.com/user-attachments/assets/1e8808c2-1f35-4afa-be84-2ebf951f9edf" />
 
-<!-- INSERTAR AQUÍ LA CAPTURA 3: PROYECTO INEXISTENTE -->
+<img width="1307" height="307" alt="image" src="https://github.com/user-attachments/assets/3d05a25c-525e-4310-8e79-c27c7d0425f0" />
 
 <!-- INSERTAR AQUÍ LA CAPTURA 4: CATEGORÍA INEXISTENTE -->
 
@@ -259,9 +233,8 @@ Ejecutar `POST /tasks` con:
 
 **Resultado esperado:** `422 Unprocessable Entity`, porque el título no puede estar vacío.
 
-**Captura 5:** respuesta de Swagger mostrando la petición y el error de validación.
+<img width="1298" height="305" alt="image" src="https://github.com/user-attachments/assets/e69edc08-d7c2-4fda-8940-984b61876545" />
 
-<!-- INSERTAR AQUÍ LA CAPTURA 5 -->
 
 ---
 
@@ -277,9 +250,8 @@ Ejecutar `POST /tasks` con:
 
 **Resultado esperado:** `201 Created`, con `project_id: null` y `category_id: null`.
 
-**Captura 6:** respuesta de Swagger mostrando el `201` y los dos campos a `null`.
+<img width="1311" height="316" alt="image" src="https://github.com/user-attachments/assets/0abf3f24-fc76-4810-9b97-bfc038b0e435" />
 
-<!-- INSERTAR AQUÍ LA CAPTURA 6 -->
 
 ---
 
@@ -295,8 +267,6 @@ python -c "import sqlite3; db = sqlite3.connect('file:taskflow.db?mode=ro', uri=
 
 **Resultado esperado:** los proyectos y las tareas válidas siguen en la base de datos después del reinicio. La tarea asociada conserva el identificador de su proyecto.
 
-**Captura 7:** terminal mostrando el comando y los proyectos y tareas recuperados de SQLite.
-
-<!-- INSERTAR AQUÍ LA CAPTURA 7 -->
+<img width="1892" height="113" alt="image" src="https://github.com/user-attachments/assets/eeb58778-cf91-40b2-92e1-b1fa67822fd1" />
 
 ---
