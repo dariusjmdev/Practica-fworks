@@ -1,15 +1,10 @@
-# Práctica 1.4 — Middleware
+# Práctica 1.5 — Modelos SQLAlchemy y conexión a base de datos
 
 ## Objetivo
 
-En esta práctica se amplía la API de TaskFlow para añadir funcionalidades que se aplican de forma común a las peticiones y respuestas:
+En esta práctica se incorpora persistencia a TaskFlow mediante **SQLAlchemy y SQLite**. Los proyectos y las tareas creados mediante la API se guardan en la base de datos `taskflow.db`.
 
-- Configuración de CORS para permitir el acceso desde el frontend.
-- Medición del tiempo de procesamiento de cada petición.
-- Identificación de las peticiones mediante un `request_id`.
-- Gestión global de errores inesperados.
-
-Además, se han trasladado los endpoints `/health`, `/version` y `/ping` a un router propio, siguiendo la indicación recibida en la práctica anterior.
+También se definen los modelos `User`, `Project`, `Category` y `Task`, sus relaciones y una dependencia de FastAPI que proporciona una sesión de base de datos a cada petición.
 
 ---
 
@@ -19,233 +14,289 @@ Además, se han trasladado los endpoints `/health`, `/version` y `/ping` a un ro
 taskflow-api/
 ├── app/
 │   ├── __init__.py
+│   ├── database.py
 │   ├── main.py
 │   ├── middleware.py
+│   ├── models.py
 │   ├── schemas.py
 │   │
 │   └── routers/
 │       ├── __init__.py
+│       ├── projects.py
 │       ├── system.py
-│       ├── tasks.py
-│       └── projects.py
+│       └── tasks.py
 │
 └── requirements.txt
-
-README.md
 ```
-
-### Responsabilidad de cada archivo
 
 | Archivo | Responsabilidad |
 |---|---|
-| `main.py` | Crea la aplicación, configura los middleware y registra los routers. |
-| `middleware.py` | Contiene la medición del tiempo, la identificación de las peticiones y la gestión de errores inesperados. |
-| `routers/system.py` | Agrupa los endpoints `/health`, `/version` y `/ping`. |
-| `routers/tasks.py` | Agrupa los endpoints relacionados con las tareas. |
-| `routers/projects.py` | Agrupa los endpoints relacionados con los proyectos. |
-| `schemas.py` | Define los modelos de entrada y salida de tareas y proyectos. |
+| `database.py` | Configura el motor SQLite, la fábrica de sesiones y la dependencia `get_db()`. |
+| `models.py` | Define las tablas y sus relaciones mediante SQLAlchemy. |
+| `schemas.py` | Define y valida los datos de entrada y salida de la API. |
+| `main.py` | Configura la aplicación, los middleware, los routers y la creación inicial de tablas. |
+| `routers/projects.py` | Contiene la creación de proyectos. |
+| `routers/tasks.py` | Contiene la creación de tareas y la comprobación de sus referencias. |
+| `routers/system.py` | Agrupa `/health`, `/version` y `/ping`. |
 
 ---
 
-## ¿Qué es un middleware?
+## Puesta en marcha
 
-Un middleware es una capa que interviene en el recorrido de una petición HTTP. Puede ejecutar acciones antes de que la petición llegue al endpoint y también modificar o completar la respuesta antes de que llegue al cliente.
-
-Permite aplicar un comportamiento común a varias rutas sin tener que repetirlo en cada endpoint.
-
-En esta práctica se utiliza para configurar CORS, medir el tiempo, identificar las peticiones y gestionar errores inesperados.
-
----
-
-## Configuración de CORS
-
-Se ha configurado `CORSMiddleware` para permitir por defecto las peticiones desde:
-
-```text
-http://localhost:5173
-```
-
-Este es el origen del frontend indicado en el enunciado.
-
-La configuración permite los métodos `GET`, `POST` y `OPTIONS`, y las cabeceras de petición `Content-Type` y `Authorization`.
-
-Los orígenes se pueden configurar mediante la variable de entorno `ALLOWED_ORIGINS`. Para indicar varios orígenes, se separan mediante comas.
-
-Ejemplo en PowerShell:
+Desde la carpeta `taskflow-api`, con el entorno virtual activado, instalar las dependencias:
 
 ```powershell
-$env:ALLOWED_ORIGINS = "http://localhost:5173,https://frontend.ejemplo.com"
-uvicorn app.main:app --reload
+python -m pip install -r requirements.txt
 ```
 
-El dominio `frontend.ejemplo.com` es únicamente ilustrativo; debe sustituirse por el origen real si se necesita.
+Arrancar la aplicación:
 
-También se ha configurado:
-
-```python
-expose_headers=["X-Process-Time", "X-Request-ID"]
+```powershell
+python -m uvicorn app.main:app --reload
 ```
 
-Esto permite que un frontend autorizado pueda leer esas cabeceras desde JavaScript en peticiones entre distintos orígenes.
-
-> CORS es una política aplicada por los navegadores. Herramientas como Postman o `curl` pueden enviar peticiones aunque el origen no esté autorizado.
-
----
-
-## Medición del tiempo de procesamiento
-
-El middleware `RequestContextMiddleware` utiliza `perf_counter()` para medir el tiempo transcurrido durante el procesamiento de la petición.
-
-El resultado se añade a la respuesta mediante la cabecera:
+La documentación interactiva estará disponible en:
 
 ```text
-X-Process-Time: 5.40 ms
+http://127.0.0.1:8000/docs
 ```
 
-El valor se expresa en milisegundos y cambia en cada petición.
-
-Esta medición llega hasta que la aplicación comienza a devolver la respuesta. En respuestas de tipo streaming, no mide necesariamente el tiempo de envío completo.
+Al arrancar, `Base.metadata.create_all()` crea las tablas que falten en la base de datos inicial. Este método **no modifica las tablas existentes** si cambia su definición. Los cambios posteriores del esquema requieren migraciones.
 
 ---
 
-## Identificador de petición
+## SQLAlchemy y el ORM
 
-Cada petición recibe un identificador generado con `uuid4()`. Se devuelve en la cabecera:
+Un ORM permite trabajar con tablas de una base de datos mediante clases y objetos de Python.
+
+En TaskFlow, cada modelo representa una tabla. Por ejemplo:
+
+- La clase `Project` representa la tabla `projects`.
+- Un objeto `Project` representa un proyecto que puede guardarse como una fila.
+- Los atributos de la clase corresponden a las columnas de la tabla.
+
+El ORM resulta útil para crear objetos, consultar datos y recorrer relaciones desde Python. SQL directo puede ser apropiado cuando se necesita controlar una consulta con precisión, por ejemplo, para realizar agregaciones o analizar su rendimiento.
+
+---
+
+## Modelo de datos
+
+```mermaid
+erDiagram
+    PROJECT o|--o{ TASK : agrupa
+    CATEGORY o|--o{ TASK : clasifica
+
+    USER {
+        int id PK
+        string username UK
+        string hashed_password
+    }
+
+    PROJECT {
+        int id PK
+        string name
+        string description "Opcional"
+        datetime created_at
+    }
+
+    CATEGORY {
+        int id PK
+        string name
+        string color
+    }
+
+    TASK {
+        int id PK
+        string title "Máximo 100 caracteres"
+        string description "Opcional"
+        boolean completed
+        datetime created_at
+        int project_id FK "Opcional"
+        int category_id FK "Opcional"
+    }
+```
+
+### Decisiones del modelo
+
+- Los usuarios trabajan en un **espacio compartido**, tal y como se indica para esta práctica. Por ello, `Project` no tiene `owner_id`.
+- Una tarea puede existir sin proyecto y sin categoría.
+- Un proyecto puede tener varias tareas y una categoría puede clasificar varias tareas.
+- `back_populates` conecta los dos lados de cada relación. Por ejemplo, permite consultar `project.tasks` y `task.project`.
+- Al eliminar un proyecto, sus tareas asociadas se eliminan en cascada.
+- Al eliminar una categoría, sus tareas se conservan y su `category_id` pasa a `NULL`.
+- `Project.created_at` conserva la información que ya devolvía el endpoint de proyectos en la práctica anterior.
+
+---
+
+## Conexión a SQLite
+
+El archivo `app/database.py` configura el motor de SQLAlchemy y, por defecto, utiliza:
 
 ```text
-X-Request-ID: identificador-unico
+taskflow-api/taskflow.db
 ```
 
-El identificador también se guarda en el estado de la petición. Si ocurre un error, se incluye en el registro del servidor para facilitar la relación entre la respuesta recibida y el error registrado.
+La ruta puede cambiarse mediante la variable de entorno `TASKFLOW_DB_PATH`.
+
+La conexión utiliza `check_same_thread=False` para permitir que las distintas partes síncronas de una petición de FastAPI puedan ejecutarse en hilos diferentes. Cada petición utiliza su propia sesión.
+
+También se activa `PRAGMA foreign_keys=ON` en cada conexión. Esto permite que SQLite compruebe las claves foráneas y aplique las reglas de borrado configuradas.
+
+### Configuración por entorno
+
+| Variable | Valor por defecto | Función |
+|---|---:|---|
+| `TASKFLOW_DB_PATH` | Ruta de `taskflow-api/taskflow.db` | Permite usar otro archivo de base de datos. |
+| `TASKFLOW_SQLITE_TIMEOUT` | 5 segundos | Tiempo de espera ante un bloqueo de SQLite. |
+| `TASKFLOW_POOL_TIMEOUT` | 10 segundos | Tiempo máximo de espera por una conexión disponible del pool. |
+
+SQLAlchemy reutiliza conexiones mediante un pool. La opción `pool_pre_ping=True` comprueba una conexión cuando se obtiene del pool para usarla.
 
 ---
 
-## Gestión de errores inesperados
+## Ciclo de vida de la sesión
 
-Se ha registrado un manejador global de excepciones. Además, `ErrorHandlingMiddleware` captura los errores inesperados de las capas interiores y utiliza ese mismo manejador para generar la respuesta.
+`SessionLocal` es la fábrica que crea las sesiones de SQLAlchemy.
 
-Cuando ocurre un error no controlado:
+La dependencia `get_db()`:
 
-1. Se registra el error con sus detalles en el servidor.
-2. Se devuelve al cliente el estado `500 Internal Server Error`.
-3. Se muestra un mensaje genérico sin exponer el stacktrace.
-4. Se añade un `error_code` para identificar el tipo de error.
+1. Crea una sesión.
+2. La proporciona a la petición mediante `yield`.
+3. La cierra en `finally`, aunque durante la petición se produzca una excepción.
 
-Ejemplo de respuesta:
+La opción `expire_on_commit=False` mantiene disponibles los atributos cargados de los objetos después de confirmar los cambios con `commit()`.
 
-```json
-{
-  "error": "Se ha producido un error interno en el servidor.",
-  "error_code": "INTERNAL_SERVER_ERROR"
-}
-```
+### Dependencias anidadas
 
-Los detalles de la excepción se mantienen en los registros del servidor para poder investigar el problema.
+En `POST /tasks`, la función `validate_task_references()` recibe la sesión mediante `Depends(get_db)` y comprueba que el proyecto y la categoría existan cuando se indican.
 
----
+La ruta también recibe `Depends(get_db)`. FastAPI reutiliza la sesión dentro de la misma petición, de modo que la comprobación y la inserción trabajan con ella.
 
-## Orden de ejecución
-
-Los middleware se añaden en `main.py` teniendo en cuenta que la última capa registrada es la primera que recibe la petición.
-
-El recorrido de una petición es:
-
-1. **`RequestContextMiddleware`**: inicia la medición y genera el identificador.
-2. **`CORSMiddleware`**: comprueba el origen y aplica las cabeceras CORS correspondientes.
-3. **`ErrorHandlingMiddleware`**: captura errores inesperados de las capas interiores.
-4. **Endpoint**: procesa la petición.
-
-La respuesta vuelve atravesando las capas en sentido inverso.
-
-Si un endpoint produce un error, `ErrorHandlingMiddleware` llama al manejador, que registra la excepción y genera la respuesta 500. Después, las capas exteriores pueden añadir sus cabeceras a esa respuesta.
+Las rutas de sistema declaran la dependencia a nivel de router. Estas rutas devuelven información fija y no necesitan ejecutar consultas.
 
 ---
 
 ## Pruebas realizadas
 
-### 1. Comprobación de rutas y cabeceras
+### 1. Creación de un proyecto
 
-Se ha ejecutado `GET /ping` desde Swagger.
+En Swagger, ejecutar `POST /projects` con:
 
-**Resultado obtenido:**
+```json
+{
+  "name": "Proyecto de prueba 1.5"
+}
+```
 
-- Estado `200 OK`.
-- Respuesta `{"message": "pong"}`.
-- Cabecera `X-Process-Time`.
-- Cabecera `X-Request-ID`.
+**Resultado esperado:** `201 Created`, con un identificador generado, la descripción y la fecha de creación.
 
-**Captura 1:** respuesta de `/ping` en Swagger, incluyendo el código 200, el cuerpo y las cabeceras.
+**Captura 1:** petición y respuesta de Swagger, incluyendo el código `201` y el `id` del proyecto.
 
 <!-- INSERTAR AQUÍ LA CAPTURA 1 -->
 
 ---
 
-### 2. CORS con origen permitido
+### 2. Creación de una tarea asociada a un proyecto
 
-Se ha realizado una petición preflight con el origen permitido:
+Ejecutar `POST /tasks` con el identificador obtenido en la prueba anterior. El siguiente `1` es un ejemplo y debe sustituirse por el ID real:
 
-```powershell
-curl.exe -i -X OPTIONS http://127.0.0.1:8000/ping -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: GET"
+```json
+{
+  "title": "Preparar la entrega",
+  "project_id": 1
+}
 ```
 
-**Resultado obtenido:**
+**Resultado esperado:** `201 Created`, con el `project_id` indicado y `completed: false`.
 
-- Estado `200 OK`.
-- Cabecera `access-control-allow-origin: http://localhost:5173`.
-- Presencia de `X-Process-Time` y `X-Request-ID`.
-
-**Captura 2:** comando ejecutado y respuesta completa en la terminal.
+**Captura 2:** petición y respuesta de Swagger, mostrando el código `201`, el ID de la tarea y su `project_id`.
 
 <!-- INSERTAR AQUÍ LA CAPTURA 2 -->
 
 ---
 
-### 3. CORS con origen no permitido
+### 3. Referencias inexistentes
 
-Se ha repetido la petición con un origen no autorizado:
+Para comprobar un proyecto inexistente, ejecutar `POST /tasks` con un ID positivo que no exista:
 
-```powershell
-curl.exe -i -X OPTIONS http://127.0.0.1:8000/ping -H "Origin: http://ejemplo-no-permitido.com" -H "Access-Control-Request-Method: GET"
+```json
+{
+  "title": "Proyecto inexistente",
+  "project_id": 999999
+}
 ```
 
-**Resultado obtenido:**
+**Resultado esperado:** `404` con `El proyecto no existe`.
 
-- Estado `400 Bad Request`.
-- Mensaje `Disallowed CORS origin`.
-- El origen no aparece autorizado en `access-control-allow-origin`.
-- Las cabeceras de tiempo e identificador siguen presentes.
+Para comprobar una categoría inexistente, ejecutar por separado:
 
-**Captura 3:** comando ejecutado y respuesta completa en la terminal.
+```json
+{
+  "title": "Categoría inexistente",
+  "category_id": 999999
+}
+```
 
-<!-- INSERTAR AQUÍ LA CAPTURA 3 -->
+**Resultado esperado:** `404` con `La categoría no existe`.
+
+**Capturas 3 y 4:** respuestas de Swagger para cada prueba, mostrando el JSON enviado, el código `404` y el mensaje correspondiente.
+
+<!-- INSERTAR AQUÍ LA CAPTURA 3: PROYECTO INEXISTENTE -->
+
+<!-- INSERTAR AQUÍ LA CAPTURA 4: CATEGORÍA INEXISTENTE -->
 
 ---
 
-### 4. Error inesperado
+### 4. Validación del título
 
-Para comprobar el manejo de excepciones, se ha creado temporalmente una ruta que provoca un error:
+Ejecutar `POST /tasks` con:
 
-```python
-@router.get("/test-error", include_in_schema=False)
-def test_error():
-    raise RuntimeError("Error interno de prueba")
+```json
+{
+  "title": ""
+}
 ```
 
-Se ha realizado la siguiente petición:
+**Resultado esperado:** `422 Unprocessable Entity`, porque el título no puede estar vacío.
+
+**Captura 5:** respuesta de Swagger mostrando la petición y el error de validación.
+
+<!-- INSERTAR AQUÍ LA CAPTURA 5 -->
+
+---
+
+### 5. Tarea sin proyecto ni categoría
+
+Ejecutar `POST /tasks` con:
+
+```json
+{
+  "title": "Tarea independiente"
+}
+```
+
+**Resultado esperado:** `201 Created`, con `project_id: null` y `category_id: null`.
+
+**Captura 6:** respuesta de Swagger mostrando el `201` y los dos campos a `null`.
+
+<!-- INSERTAR AQUÍ LA CAPTURA 6 -->
+
+---
+
+### 6. Persistencia después de reiniciar
+
+1. Detener Uvicorn con `Ctrl+C`.
+2. Volver a arrancarlo.
+3. Abrir otra terminal en `taskflow-api` y ejecutar:
 
 ```powershell
-curl.exe -i http://127.0.0.1:8000/test-error
+python -c "import sqlite3; db = sqlite3.connect('file:taskflow.db?mode=ro', uri=True); print('Proyectos:', db.execute('SELECT id, name FROM projects').fetchall()); print('Tareas:', db.execute('SELECT id, title, project_id, category_id FROM tasks').fetchall()); db.close()"
 ```
 
-**Resultado obtenido:**
+**Resultado esperado:** los proyectos y las tareas válidas siguen en la base de datos después del reinicio. La tarea asociada conserva el identificador de su proyecto.
 
-- Estado `500 Internal Server Error`.
-- Respuesta JSON con mensaje genérico y `error_code`.
-- El stacktrace no aparece en la respuesta del cliente.
-- Se incluyen `X-Process-Time` y `X-Request-ID`.
+**Captura 7:** terminal mostrando el comando y los proyectos y tareas recuperados de SQLite.
 
-**Captura 4:** respuesta 500 en la terminal, mostrando el JSON y las cabeceras.
-
-<!-- INSERTAR AQUÍ LA CAPTURA 4 -->
+<!-- INSERTAR AQUÍ LA CAPTURA 7 -->
 
 ---
