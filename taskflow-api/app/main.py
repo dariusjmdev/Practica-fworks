@@ -15,6 +15,7 @@ from app.routers.projects import router as projects_router
 from app.routers.system import router as system_router
 from app.routers.tasks import router as tasks_router
 from app.database import Base, engine
+from app.routers.categories import router as categories_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -62,7 +63,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+        # Autoriza también los métodos usados para editar y eliminar.
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
     # Permite al frontend leer estas cabeceras desde JavaScript.
     expose_headers=["X-Process-Time", "X-Request-ID"],
@@ -78,3 +80,4 @@ app.add_middleware(RequestContextMiddleware)
 app.include_router(system_router)
 app.include_router(tasks_router)
 app.include_router(projects_router)
+app.include_router(categories_router)
