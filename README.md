@@ -222,16 +222,15 @@ Cuerpo:
 
 ```json
 {
-  "name": "Desarrollo",
+  "name": "Desarrollo2",
   "color": "#2196F3"
 }
 ```
 
 **Resultado esperado:** `201 Created` y una categoría con su ID.
 
-**Captura 1:** petición y respuesta de creación de categoría.
+<img width="860" height="121" alt="image" src="https://github.com/user-attachments/assets/da38dae8-ecb8-4cc9-8c0f-4d89008a9cc6" />
 
-<!-- INSERTAR CAPTURA 1 AQUÍ -->
 
 ---
 
@@ -247,16 +246,15 @@ Cuerpo:
 
 ```json
 {
-  "name": "Prueba CRUD 1.6",
+  "name": "Prueba 2 CRUD 1.6",
   "description": "Proyecto para comprobar las operaciones CRUD"
 }
 ```
 
 **Resultado esperado:** `201 Created` y un proyecto con su ID.
 
-**Captura 2:** petición y respuesta de creación de proyecto.
+<img width="867" height="125" alt="image" src="https://github.com/user-attachments/assets/41efffad-82af-4349-8bbb-f892c48a4ecb" />
 
-<!-- INSERTAR CAPTURA 2 AQUÍ -->
 
 ---
 
@@ -272,18 +270,17 @@ Cuerpo:
 
 ```json
 {
-  "title": "Probar el CRUD",
+  "title": "Probar el CRUD 2",
   "description": "Tarea asociada al proyecto y a la categoría",
-  "project_id": 3,
-  "category_id": 1
+  "project_id": 4,
+  "category_id": 2
 }
 ```
 
 **Resultado esperado:** `201 Created`, un ID para la tarea y las dos referencias enviadas.
 
-**Captura 3:** creación de la tarea mostrando `project_id` y `category_id`.
+<img width="868" height="160" alt="image" src="https://github.com/user-attachments/assets/449e611d-0509-46ae-ba1c-60dda9d2abda" />
 
-<!-- INSERTAR CAPTURA 3 AQUÍ -->
 
 ---
 
@@ -292,20 +289,18 @@ Cuerpo:
 Ejecutar:
 
 ```http
-GET /tasks/4
-GET /projects/3
-GET /categories/1
+GET /tasks/5
+GET /projects/4
+GET /categories/2
 ```
 
 **Resultado esperado:** los tres devuelven `200 OK`. Los detalles del proyecto y de la categoría incluyen la tarea dentro de `tasks`.
 
-**Captura 4:** detalle del proyecto con sus tareas.
+<img width="865" height="160" alt="image" src="https://github.com/user-attachments/assets/433c7ef9-9bb6-4050-8b6b-9c11a5b6a7a4" />
 
-<!-- INSERTAR CAPTURA 4 AQUÍ -->
 
-**Captura 5:** detalle de la categoría con sus tareas.
+<img width="860" height="275" alt="image" src="https://github.com/user-attachments/assets/3f6c2096-2df7-448c-8e7e-b036180d2929" />
 
-<!-- INSERTAR CAPTURA 5 AQUÍ -->
 
 ---
 
@@ -321,9 +316,7 @@ GET /categories
 
 **Resultado esperado:** los tres devuelven `200 OK`. El listado de tareas incluye `items`, `total`, `skip` y `limit`.
 
-**Captura 6:** listado de tareas mostrando los metadatos.
-
-<!-- INSERTAR CAPTURA 6 AQUÍ -->
+<img width="866" height="413" alt="image" src="https://github.com/user-attachments/assets/98075e89-00ff-4806-91c2-31fd0fef238f" />
 
 ---
 
@@ -332,7 +325,7 @@ GET /categories
 #### Editar proyecto
 
 ```http
-PUT /projects/3
+PUT /projects/4
 ```
 
 ```json
@@ -345,7 +338,7 @@ PUT /projects/3
 #### Editar categoría
 
 ```http
-PUT /categories/1
+PUT /categories/2
 ```
 
 ```json
@@ -358,7 +351,7 @@ PUT /categories/1
 #### Editar tarea
 
 ```http
-PUT /tasks/4
+PUT /tasks/5
 ```
 
 ```json
@@ -373,17 +366,16 @@ PUT /tasks/4
 
 **Resultado esperado:** los tres devuelven `200 OK` con los datos modificados.
 
-**Captura 7:** respuesta del proyecto editado.
+<img width="861" height="135" alt="image" src="https://github.com/user-attachments/assets/c8f0d23a-73b1-4892-98a7-b13f6c85f88d" />
 
-<!-- INSERTAR CAPTURA 7 AQUÍ -->
 
-**Captura 8:** respuesta de la categoría editada.
+<img width="862" height="263" alt="image" src="https://github.com/user-attachments/assets/3acc96f4-1b80-41b0-8ead-67b9f65a4e29" />
 
-<!-- INSERTAR CAPTURA 8 AQUÍ -->
 
 **Captura 9:** respuesta de la tarea editada con `completed: true`.
 
-<!-- INSERTAR CAPTURA 9 AQUÍ -->
+<img width="867" height="161" alt="image" src="https://github.com/user-attachments/assets/8f31bea8-5b19-4e6f-a84d-3de0068d942c" />
+
 
 ---
 
@@ -408,15 +400,11 @@ GET /tasks?project_id=3&skip=1&limit=1
 
 **Resultado esperado:** cada página contiene como máximo un resultado y `total` refleja las tareas del proyecto que cumplen el filtro.
 
-**Captura 10:** filtro por proyecto y estado.
+<img width="866" height="255" alt="image" src="https://github.com/user-attachments/assets/7cb64937-35df-43cc-a0ea-6926eb63a39f" />
 
-<!-- INSERTAR CAPTURA 10 AQUÍ -->
 
-**Capturas 11 y 12:** primera y segunda página, con los parámetros y la respuesta visibles.
+<img width="862" height="250" alt="image" src="https://github.com/user-attachments/assets/0c3e94c4-98b6-4df4-b931-f72fc72fd51e" />
 
-<!-- INSERTAR CAPTURA 11 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 12 AQUÍ -->
 
 ---
 
@@ -436,11 +424,11 @@ GET /tasks?sort_by=title&order=desc
 
 **Resultado esperado:** las tareas aparecen ordenadas por título en la dirección indicada.
 
-**Capturas 13 y 14:** resultados con orden ascendente y descendente.
+<img width="867" height="416" alt="image" src="https://github.com/user-attachments/assets/b6700d91-8a20-487f-94a0-899ee246489c" />
 
-<!-- INSERTAR CAPTURA 13 AQUÍ -->
 
-<!-- INSERTAR CAPTURA 14 AQUÍ -->
+<img width="860" height="416" alt="image" src="https://github.com/user-attachments/assets/c93c9e9b-e20e-436b-bd2f-f3d943e354dd" />
+
 
 ---
 
@@ -464,11 +452,11 @@ GET /categories/summary
 
 Los números anteriores son de ejemplo. Los valores reales dependen de los datos guardados.
 
-**Capturas 15 y 16:** respuestas de ambos resúmenes.
+<img width="861" height="97" alt="image" src="https://github.com/user-attachments/assets/6769895e-a600-4160-a8bc-1a80a23b077a" />
 
-<!-- INSERTAR CAPTURA 15 AQUÍ -->
 
-<!-- INSERTAR CAPTURA 16 AQUÍ -->
+<img width="865" height="101" alt="image" src="https://github.com/user-attachments/assets/6ba52154-f6ef-4562-a0aa-61c152fefe0e" />
+
 
 ---
 
@@ -486,9 +474,8 @@ GET /categories/999999
 
 También se puede comprobar `PUT` y `DELETE` con un ID inexistente para cada recurso.
 
-**Captura 17:** ejemplo de respuesta `404`.
+<img width="870" height="127" alt="image" src="https://github.com/user-attachments/assets/d0bf5b3c-62a4-407b-8e3f-13425e7befca" />
 
-<!-- INSERTAR CAPTURA 17 AQUÍ -->
 
 ---
 
@@ -508,9 +495,8 @@ DELETE /categories/1
 }
 ```
 
-**Captura 18:** petición y respuesta `409`.
+<img width="858" height="115" alt="image" src="https://github.com/user-attachments/assets/5bd0bd94-8251-46a4-8735-7e33bc144d6d" />
 
-<!-- INSERTAR CAPTURA 18 AQUÍ -->
 
 ---
 
@@ -528,11 +514,11 @@ Consultar después esa misma tarea mediante `GET /tasks/{id_de_la_tarea}`.
 
 **Resultado esperado:** `404 Not Found`.
 
-**Capturas 19 y 20:** borrado `204` y consulta posterior `404`.
+<img width="241" height="75" alt="image" src="https://github.com/user-attachments/assets/94448098-6387-4be0-b4c4-ce95aa258b9c" />
 
-<!-- INSERTAR CAPTURA 19 AQUÍ -->
 
-<!-- INSERTAR CAPTURA 20 AQUÍ -->
+<img width="322" height="128" alt="image" src="https://github.com/user-attachments/assets/1d8cab8b-288f-4d19-aa57-6774a2f978fa" />
+
 
 ---
 
@@ -556,11 +542,10 @@ GET /tasks/{id_de_la_tarea}
 
 **Resultado esperado:** `404 Not Found`, porque se ha eliminado junto al proyecto.
 
-**Capturas 21 y 22:** borrado del proyecto y consulta posterior de la tarea.
+<img width="241" height="75" alt="image" src="https://github.com/user-attachments/assets/94448098-6387-4be0-b4c4-ce95aa258b9c" />
 
-<!-- INSERTAR CAPTURA 21 AQUÍ -->
+<img width="313" height="122" alt="image" src="https://github.com/user-attachments/assets/b0948415-2775-42f6-9362-48324dfa5319" />
 
-<!-- INSERTAR CAPTURA 22 AQUÍ -->
 
 ---
 
@@ -582,32 +567,8 @@ GET /categories/{id_de_la_categoria}
 
 **Resultado esperado:** `404 Not Found`.
 
-**Capturas 23 y 24:** borrado de la categoría y consulta posterior.
+<img width="241" height="75" alt="image" src="https://github.com/user-attachments/assets/94448098-6387-4be0-b4c4-ce95aa258b9c" />
 
-<!-- INSERTAR CAPTURA 23 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 24 AQUÍ -->
-
----
-
-## 11. Colección de Postman
-
-La colección de Postman contiene las 15 peticiones CRUD indicadas en el enunciado:
-
-- Cinco peticiones de tareas.
-- Cinco peticiones de proyectos.
-- Cinco peticiones de categorías.
-
-También incluye las consultas de resumen para proyectos y categorías.
-
-La colección debe ejecutarse con la API arrancada. Los identificadores utilizados en las peticiones deben corresponder a los registros existentes en la base de datos.
-
-**Captura 25:** colección de Postman mostrando las carpetas y las peticiones.
-
-<!-- INSERTAR CAPTURA 25 AQUÍ -->
-
-**Captura 26:** resultado de la ejecución de la colección, si se ha ejecutado desde Postman.
-
-<!-- INSERTAR CAPTURA 26 AQUÍ -->
+<img width="328" height="113" alt="image" src="https://github.com/user-attachments/assets/bf0bd198-dddb-42f0-ab9f-36fd6344be29" />
 
 ---
