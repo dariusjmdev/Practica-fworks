@@ -1,613 +1,248 @@
-# Práctica 1.6 — CRUD completo con FastAPI y SQLAlchemy
+# Práctica 1.7 — Autenticación JWT, rotación y scopes
 
-## 1. Objetivo
+**Autor:** Darius Joanito Marinescu
 
-En esta práctica se amplía la API de TaskFlow para implementar operaciones CRUD reales sobre los recursos:
+TaskFlow incorpora registro, login y JWT de acceso de 30 minutos. La actualización añade refresh tokens de un solo uso, detección de reutilización y autorización por scopes y roles.
 
-- Tareas.
-- Proyectos.
-- Categorías.
+## Arranque
 
-Las operaciones utilizan SQLAlchemy y la base de datos SQLite configurada en la práctica anterior.
+Desde la carpeta `taskflow-api`, en una terminal CMD:
 
-También se incorporan filtros, paginación y ordenación para las tareas, junto con contadores de proyectos y categorías.
-
----
-
-## 2. Tecnologías utilizadas
-
-| Tecnología | Uso en el proyecto |
-|---|---|
-| Python | Lenguaje de programación. |
-| FastAPI | Creación de rutas y gestión de peticiones HTTP. |
-| Pydantic | Validación de datos y definición de respuestas. |
-| SQLAlchemy | Acceso a los datos mediante modelos ORM. |
-| SQLite | Almacenamiento de la información. |
-| Uvicorn | Servidor ASGI para ejecutar la aplicación. |
-| Postman | Organización y prueba de las peticiones de la API. |
-
----
-
-## 3. Estructura del proyecto
-
-```text
-taskflow-api/
-├── app/
-│   ├── __init__.py
-│   ├── database.py
-│   ├── main.py
-│   ├── middleware.py
-│   ├── models.py
-│   ├── schemas.py
-│   │
-│   └── routers/
-│       ├── __init__.py
-│       ├── categories.py
-│       ├── projects.py
-│       ├── system.py
-│       └── tasks.py
-│
-└── requirements.txt
-```
-
-### Responsabilidad de cada archivo
-
-| Archivo | Responsabilidad |
-|---|---|
-| `database.py` | Configura el motor de SQLite y proporciona sesiones de base de datos. |
-| `models.py` | Define las tablas y las relaciones mediante SQLAlchemy. |
-| `schemas.py` | Define los datos de entrada y salida y sus validaciones. |
-| `main.py` | Crea la aplicación y registra los routers y middleware. |
-| `middleware.py` | Gestiona las cabeceras de tiempo e identificador y los errores inesperados. |
-| `routers/tasks.py` | Gestiona el CRUD de tareas, los filtros y la paginación. |
-| `routers/projects.py` | Gestiona el CRUD y el resumen de proyectos. |
-| `routers/categories.py` | Gestiona el CRUD y el resumen de categorías. |
-| `routers/system.py` | Agrupa los endpoints de estado y conectividad. |
-
----
-
-## 4. Instalación y ejecución
-
-Desde la carpeta `taskflow-api`, con el entorno virtual activado, instalar las dependencias:
-
-```powershell
+```cmd
+python -m venv venv
+venv\Scripts\activate
 python -m pip install -r requirements.txt
-```
-
-Arrancar la aplicación:
-
-```powershell
+python -c "import secrets; print(secrets.token_hex(32))"
+set "TASKFLOW_SECRET_KEY=PEGA_AQUI_LA_CLAVE_GENERADA"
 python -m uvicorn app.main:app --reload
 ```
 
-Acceder a Swagger:
+El comando de Python genera una clave. Hay que copiarla y sustituir `PEGA_AQUI_LA_CLAVE_GENERADA` antes de arrancar el servidor. La clave debe tener al menos 32 bytes.
+
+Una vez iniciado, la documentación interactiva está disponible en:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-La aplicación crea las tablas que falten al arrancar y utiliza el archivo SQLite `taskflow.db`.
+El arranque crea las nuevas tablas `user_roles` y `refresh_tokens`. Los usuarios existentes y los datos del CRUD se conservan. La tabla `users` mantiene el esquema anterior.
 
----
+## Archivos y responsabilidades
 
-## 5. Endpoints implementados
-
-### 5.1. Tareas
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/tasks` | Lista tareas con filtros, paginación y ordenación. |
-| GET | `/tasks/{task_id}` | Consulta una tarea por su ID. |
-| POST | `/tasks` | Crea una tarea. |
-| PUT | `/tasks/{task_id}` | Sustituye los campos editables de una tarea. |
-| DELETE | `/tasks/{task_id}` | Elimina una tarea. |
-
-### 5.2. Proyectos
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/projects` | Lista los proyectos. |
-| GET | `/projects/{project_id}` | Consulta un proyecto e incluye sus tareas. |
-| POST | `/projects` | Crea un proyecto. |
-| PUT | `/projects/{project_id}` | Sustituye los campos editables de un proyecto. |
-| DELETE | `/projects/{project_id}` | Elimina un proyecto y sus tareas asociadas. |
-| GET | `/projects/summary` | Devuelve el total de proyectos y cuántos tienen tareas. |
-
-### 5.3. Categorías
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/categories` | Lista las categorías. |
-| GET | `/categories/{category_id}` | Consulta una categoría e incluye sus tareas. |
-| POST | `/categories` | Crea una categoría. |
-| PUT | `/categories/{category_id}` | Sustituye los campos editables de una categoría. |
-| DELETE | `/categories/{category_id}` | Elimina una categoría si no tiene tareas asociadas. |
-| GET | `/categories/summary` | Devuelve el total de categorías y cuántas tienen tareas. |
-
----
-
-## 6. Filtros, paginación y ordenación de tareas
-
-El endpoint `GET /tasks` admite los siguientes parámetros:
-
-| Parámetro | Función | Valor por defecto |
-|---|---|---|
-| `project_id` | Filtra por proyecto. | Sin filtro. |
-| `completed` | Filtra por estado `true` o `false`. | Sin filtro. |
-| `skip` | Número de resultados que se omiten. | `0`. |
-| `limit` | Número máximo de resultados. | `20`. |
-| `sort_by` | Ordena por `id`, `title` o `created_at`. | `id`. |
-| `order` | Dirección `asc` o `desc`. | `asc`. |
-
-El límite debe estar entre `1` y `100`. Los filtros `project_id` y `completed` pueden combinarse.
-
-Ejemplo:
-
-```http
-GET /tasks?project_id=3&completed=true&skip=0&limit=10&sort_by=title&order=asc
-```
-
-La respuesta incluye los resultados y los metadatos de paginación:
-
-```json
-{
-  "items": [],
-  "total": 0,
-  "skip": 0,
-  "limit": 10
-}
-```
-
-`total` representa el número de tareas que cumplen los filtros antes de aplicar la paginación. Los valores anteriores son ilustrativos.
-
----
-
-## 7. Relaciones y decisiones de borrado
-
-Una tarea puede estar asociada opcionalmente a un proyecto y a una categoría.
-
-### Proyectos
-
-Cuando se elimina un proyecto, sus tareas asociadas se eliminan en cascada. La relación está configurada en SQLAlchemy y la clave foránea tiene `ON DELETE CASCADE`.
-
-### Categorías
-
-El endpoint de borrado devuelve **409 Conflict** si la categoría tiene tareas asociadas. Para eliminarla desde la API, primero hay que desvincularlas o asignarlas a otra categoría.
-
-En la base de datos, la relación conserva `ON DELETE SET NULL` de la práctica 1.5. Por tanto, una eliminación directa de la categoría en SQLite desvincula las tareas. El bloqueo `409` es la política aplicada por el endpoint de la API.
-
-Las claves foráneas se activan para cada conexión SQLite mediante `PRAGMA foreign_keys=ON`.
-
----
-
-## 8. Optimización de consultas
-
-- Los filtros y la paginación de tareas se aplican en la consulta SQL, por lo que solo se recupera la página solicitada.
-- El número total de resultados se calcula con `COUNT`.
-- Los resúmenes de proyectos y categorías calculan los contadores en la base de datos.
-- Los detalles de proyectos y categorías utilizan `selectinload` para cargar sus tareas asociadas de forma explícita.
-
----
-
-## 9. Manejo de errores y códigos HTTP
-
-| Código | Uso en la API |
+| Archivo | Responsabilidad |
 |---|---|
-| `200 OK` | Consulta o modificación realizada correctamente. |
-| `201 Created` | Recurso creado correctamente. |
-| `204 No Content` | Recurso eliminado correctamente, sin cuerpo de respuesta. |
-| `404 Not Found` | El recurso o una referencia indicada no existe. |
-| `409 Conflict` | Se intenta borrar una categoría que tiene tareas. |
-| `422 Unprocessable Entity` | Los datos o parámetros no cumplen el formato o las validaciones. |
-| `500 Internal Server Error` | Se ha producido un error inesperado en el servidor. |
+| `app/security.py` | Hashing, JWT, dependencia de usuario y rotación transaccional. |
+| `app/roles.py` | Relación de roles con los scopes permitidos. |
+| `app/routers/auth.py` | Registro, login y renovación. |
+| `app/manage_users.py` | Asignación local de roles. |
+| `app/models.py` | Entidades CRUD, cuenta, rol y estado de refresh tokens. |
+| `app/schemas.py` | Validación y contratos de respuesta. |
+| `app/routers/tasks.py` | CRUD con scopes de tareas. |
+| `app/routers/projects.py` | CRUD con scopes de proyectos. |
+| `app/routers/categories.py` | CRUD con scopes de categorías. |
+| `app/database.py` | Conexiones SQLite, claves foráneas y sesión por petición. |
+| `app/main.py` | Arranque, middleware y registro de routers. |
 
-Los errores `404` diferencian si falta una tarea, un proyecto o una categoría. Los errores inesperados se registran en el servidor y devuelven al cliente un mensaje genérico.
+## Cobertura de la rúbrica
 
----
+| Criterio de excelente | Implementación | Cómo demostrarlo |
+|---|---|---|
+| Sal única y coste documentado | bcrypt con sal aleatoria y coste 12. | Comparar las sales de dos cuentas con la misma contraseña. |
+| Refresh token y rotación | Secreto de un solo uso, sustitución atómica y revocación de familia al reutilizarlo. | Renovación y reutilización en Swagger. |
+| Dependencias anidadas y scopes por rol | `Security` → `get_current_user` → `OAuth2PasswordBearer` y `get_db`. Se comprueban los scopes del token y el rol actual. | `viewer` obtiene 200 al leer y 403 al escribir. |
+| 401 y `WWW-Authenticate` | Token ausente, inválido, caducado o revocado devuelve 401 con `Bearer`. | Prueba de expiración y cabecera `Bearer`. |
+| Mensajes genéricos | Login erróneo usa el mismo mensaje. Registro nuevo y duplicado tienen el mismo contrato público. | Registro repetido y pruebas de login. |
+| Análisis de amenazas | Amenazas y mitigaciones documentadas más abajo. | Revisión de esta documentación y del código. |
 
-## 10. Pruebas y evidencias
+## Registro y contraseñas
 
-> Los ID de los ejemplos corresponden a los datos utilizados durante las pruebas.
-> Si la base de datos devuelve otros ID, deben sustituirse por los reales.
+`POST /auth/register` recibe `username` y `password`. El servidor calcula un hash con `passlib[bcrypt]` y asigna el rol `member`. El cliente no puede escoger un rol mediante este endpoint.
 
-### 10.1. Crear categoría
+bcrypt genera una sal aleatoria en cada hash. El coste configurado es **12**, equivalente a un factor de trabajo exponencial de \(2^{12}\). Se limita la entrada a 72 bytes UTF-8 y se rechazan bytes nulos para evitar entradas incompatibles o truncadas.
 
-Ejecutar:
+La cuenta conserva un `username` único. El registro devuelve **201** con el mismo mensaje genérico si el nombre es nuevo o ya está utilizado. Repetir el registro no modifica la contraseña de la cuenta existente.
 
-```http
-POST /categories
-```
+El 201 de este contrato no permite confirmar al cliente si se insertó una nueva fila.
 
-Cuerpo:
+## Login y JWT
 
-```json
-{
-  "name": "Desarrollo",
-  "color": "#2196F3"
-}
-```
-
-**Resultado esperado:** `201 Created` y una categoría con su ID.
-
-**Captura 1:** petición y respuesta de creación de categoría.
-
-<!-- INSERTAR CAPTURA 1 AQUÍ -->
-
----
-
-### 10.2. Crear proyecto
-
-Ejecutar:
-
-```http
-POST /projects
-```
-
-Cuerpo:
+`POST /auth/login` recibe un formulario OAuth2 con `username`, `password` y `scope` opcional. Un login válido devuelve:
 
 ```json
 {
-  "name": "Prueba CRUD 1.6",
-  "description": "Proyecto para comprobar las operaciones CRUD"
+  "access_token": "<JWT de acceso>",
+  "token_type": "bearer",
+  "refresh_token": "<secreto de renovación>",
+  "expires_in": 1800,
+  "scope": "categories:read categories:write projects:read projects:write tasks:read tasks:write"
 }
 ```
 
-**Resultado esperado:** `201 Created` y un proyecto con su ID.
+El JWT usa **HS256** e incorpora:
 
-**Captura 2:** petición y respuesta de creación de proyecto.
+- `sub`: usuario al que pertenece el token.
+- `iat`: momento de emisión.
+- `exp`: momento de expiración.
+- `jti`: identificador del token.
+- `type`: tipo de token.
+- `scope`: permisos concedidos.
+- `sid`: identificador de la familia de sesión.
 
-<!-- INSERTAR CAPTURA 2 AQUÍ -->
+La validación fija el algoritmo permitido y exige `exp` y `sub`, tipo `access`, sesión válida y usuario existente.
 
----
+Los errores de usuario inexistente y contraseña incorrecta devuelven el mismo **401** y ejecutan una comprobación bcrypt. Las respuestas con tokens incluyen `Cache-Control: no-store` y `Pragma: no-cache`.
 
-### 10.3. Crear tarea relacionada
+## Renovación y revocación
 
-Ejecutar:
-
-```http
-POST /tasks
-```
-
-Cuerpo:
+`POST /auth/refresh` recibe:
 
 ```json
 {
-  "title": "Probar el CRUD",
-  "description": "Tarea asociada al proyecto y a la categoría",
-  "project_id": 3,
-  "category_id": 1
+  "refresh_token": "<último refresh token recibido>"
 }
 ```
 
-**Resultado esperado:** `201 Created`, un ID para la tarea y las dos referencias enviadas.
+El refresh es un secreto aleatorio de 32 bytes. Su huella SHA-256 se guarda en SQLite. Conservar únicamente la huella reduce el impacto de una lectura de la tabla. No se necesita bcrypt para este secreto porque tiene alta entropía y no lo elige una persona.
 
-**Captura 3:** creación de la tarea mostrando `project_id` y `category_id`.
+Cada login crea una familia con un vencimiento absoluto de **siete días**, decisión de esta implementación. Renovar devuelve un nuevo access token y refresh token, consume el anterior y conserva el vencimiento de la familia.
 
-<!-- INSERTAR CAPTURA 3 AQUÍ -->
+Los permisos renovados son la intersección de los concedidos inicialmente con los actuales del usuario.
 
----
+Un `UPDATE` condicional y una transacción hacen que dos peticiones concurrentes no puedan consumir válidamente el mismo refresh. Si se presenta uno ya consumido, se revoca toda su familia.
 
-### 10.4. Consultar los tres recursos
+Los access tokens también consultan el estado de la familia, por lo que quedan invalidados inmediatamente cuando se revoca.
 
-Ejecutar:
+La pérdida de una respuesta de renovación obliga a iniciar sesión otra vez si se reintenta el refresh ya consumido. Es la política estricta de reutilización elegida para esta práctica.
 
-```http
-GET /tasks/4
-GET /projects/3
-GET /categories/1
+## Roles y scopes
+
+| Rol | Lectura | Escritura |
+|---|---|---|
+| `member` | Tareas, proyectos y categorías. | Tareas, proyectos y categorías. |
+| `viewer` | Tareas, proyectos y categorías. | Denegada con 403. |
+
+Los usuarios registrados anteriormente sin fila en `user_roles` se consideran `member` para conservar el comportamiento de la práctica anterior. Un rol desconocido recibe cero permisos.
+
+Todos comparten el espacio de proyectos. Esta extensión introduce roles porque la rúbrica de excelente los pide. También protege las lecturas de negocio con su scope. Las rutas de sistema y las de registro y login permiten el acceso sin un JWT de acceso.
+
+Para asignar el rol `viewer` a una cuenta existente, desde `taskflow-api`:
+
+```cmd
+python -m app.manage_users --username lector_prueba --role viewer
 ```
 
-**Resultado esperado:** los tres devuelven `200 OK`. Los detalles del proyecto y de la categoría incluyen la tarea dentro de `tasks`.
+Para devolverle el rol `member`:
 
-**Captura 4:** detalle del proyecto con sus tareas.
-
-<!-- INSERTAR CAPTURA 4 AQUÍ -->
-
-**Captura 5:** detalle de la categoría con sus tareas.
-
-<!-- INSERTAR CAPTURA 5 AQUÍ -->
-
----
-
-### 10.5. Listar los tres recursos
-
-Ejecutar:
-
-```http
-GET /tasks
-GET /projects
-GET /categories
+```cmd
+python -m app.manage_users --username lector_prueba --role member
 ```
 
-**Resultado esperado:** los tres devuelven `200 OK`. El listado de tareas incluye `items`, `total`, `skip` y `limit`.
+El registro público no permite autoasignarse un rol. Este comando requiere acceso local al equipo y a la base de datos.
 
-**Captura 6:** listado de tareas mostrando los metadatos.
+Una reducción de rol se aplica a los JWT ya emitidos al consultar el rol actual. Un aumento de permisos requiere un nuevo login si el token previo carecía de esos scopes.
 
-<!-- INSERTAR CAPTURA 6 AQUÍ -->
+## Contrato de errores
 
----
+| Estado | Causa |
+|---|---|
+| 401 + `WWW-Authenticate: Bearer` | Falta de token, firma inválida, caducidad o familia revocada. |
+| 403 + información del scope | Identidad válida con permisos insuficientes. |
+| 404 | Recurso CRUD inexistente tras superar la autorización. |
+| 409 | Conflicto del CRUD, como una categoría con tareas. |
+| 422 | Datos o parámetros inválidos. |
 
-### 10.6. Editar los tres recursos
+## Análisis de amenazas
 
-#### Editar proyecto
+| Amenaza | Medida aplicada | Límite que permanece |
+|---|---|---|
+| Lectura de contraseñas en la base de datos | Hash bcrypt con sal y coste 12. | Las contraseñas débiles pueden sufrir ataques offline. |
+| Descubrimiento de usuarios por mensajes | Login y registro con respuestas genéricas. | El coste de las operaciones y factores externos pueden producir diferencias temporales. |
+| Manipulación de un JWT | Firma HS256, algoritmo fijado y validación de claims. | El robo de la clave compromete las firmas. |
+| Robo del access token | Duración de 30 minutos y familia verificable. | Un portador puede usarlo mientras siga vigente y autorizado. |
+| Robo y reutilización del refresh | Secreto aleatorio, hash en base de datos, rotación y revocación de familia. | Un secreto robado puede usarse antes de que se detecte su reutilización. |
+| Dos renovaciones simultáneas | Consumo mediante `UPDATE` condicional dentro de una transacción. | La sesión se revoca al detectar el segundo uso. |
+| Solicitud de scopes superiores | Intersección con permisos del rol y rechazo de scopes no permitidos. | El operador local debe proteger su acceso a la base de datos. |
+| Rol cambiado con un JWT antiguo | Comparación con el rol actual en cada petición. | Requiere consultar la base de datos. |
+| Exposición de secretos en capturas o Git | Configuración por entorno y documentación sin tokens activos. | El operador debe revisar lo que publica. |
+| Intercepción de credenciales | La demo se ejecuta en localhost. | Un despliegue por red requiere HTTPS. |
 
-```http
-PUT /projects/3
-```
+Esta práctica no incorpora un sistema de limitación de intentos de login. Se documenta la fuerza bruta como riesgo residual.
 
-```json
-{
-  "name": "Proyecto actualizado",
-  "description": "Proyecto editado durante las pruebas"
-}
-```
+Los tokens se envían explícitamente como `Bearer` o en el cuerpo JSON. Un futuro cliente deberá evitar filtrarlos mediante XSS o almacenamiento accesible a scripts comprometidos.
 
-#### Editar categoría
+## Endpoints principales
 
-```http
-PUT /categories/1
-```
+Las rutas de negocio requieren autenticación y el scope correspondiente.
 
-```json
-{
-  "name": "Desarrollo actualizado",
-  "color": "#FF5733"
-}
-```
+| Recurso | Operaciones |
+|---|---|
+| `/auth/register` | POST: registro con mensaje genérico. |
+| `/auth/login` | POST: formulario de login y emisión de tokens. |
+| `/auth/refresh` | POST: renovación y rotación del refresh token. |
+| `/tasks` | Crear y listar; obtener, sustituir y eliminar por ID. |
+| `/projects` | Crear y listar; obtener, sustituir y eliminar por ID; resumen. |
+| `/categories` | Crear y listar; obtener, sustituir y eliminar por ID; resumen. |
+| Rutas de sistema | Comprobaciones de salud, versión y ping. |
 
-#### Editar tarea
+## Pruebas y evidencias
 
-```http
-PUT /tasks/4
-```
+Las imágenes corresponden a respuestas reales capturadas durante el desarrollo. Las primeras muestran el flujo anterior al cambio del contrato de registro; las demás corresponden a la actualización de seguridad. Las respuestas con tokens completos no se publican.
 
-```json
-{
-  "title": "CRUD probado",
-  "description": "Tarea editada durante las pruebas",
-  "project_id": 3,
-  "category_id": 1,
-  "completed": true
-}
-```
+### Registro y acceso protegido
 
-**Resultado esperado:** los tres devuelven `200 OK` con los datos modificados.
+El registro inicial devolvió **201**. En la versión actual, el registro devuelve un mensaje genérico, como se muestra más adelante.
 
-**Captura 7:** respuesta del proyecto editado.
+![Registro en la versión inicial](capturas/01_registro_inicial.png)
 
-<!-- INSERTAR CAPTURA 7 AQUÍ -->
+Una petición de escritura sin autenticar devolvió **401**.
 
-**Captura 8:** respuesta de la categoría editada.
+![Petición sin autenticar](capturas/02_sin_token.png)
 
-<!-- INSERTAR CAPTURA 8 AQUÍ -->
+Una petición autenticada permitió crear una tarea y devolvió **201**.
 
-**Captura 9:** respuesta de la tarea editada con `completed: true`.
+![Tarea creada con autenticación](capturas/03_tarea_autorizada.png)
 
-<!-- INSERTAR CAPTURA 9 AQUÍ -->
+### Roles y scopes
 
----
+Con el rol `viewer`, la lectura de proyectos devolvió **200** y la escritura devolvió **403**. Con `member`, la creación de un proyecto devolvió **201**.
 
-### 10.7. Filtros y paginación
+![Viewer consulta proyectos](capturas/04_viewer_lectura.png)
 
-Después de marcar la tarea como completada, ejecutar:
+![Viewer recibe 403 al escribir](capturas/05_viewer_escritura.png)
 
-```http
-GET /tasks?project_id=3&completed=true&skip=0&limit=1
-```
+![Member crea un proyecto](capturas/06_member_escritura.png)
 
-**Resultado esperado:** `200 OK`, la tarea aparece en `items` y la respuesta incluye `total`, `skip` y `limit`.
+### Caducidad y cabecera de autenticación
 
-Para comprobar que se combinan los filtros, repetir con `completed=false`. La tarea completada no debe aparecer en esa respuesta.
+La comprobación local obtuvo un token de la API, verificó su firma y comprobó la petición con el token vigente.
 
-Para comprobar la paginación con claridad, crear otra tarea en el mismo proyecto. Después consultar:
+Después modificó el valor de expiración y firmó el nuevo token con la misma clave. El resultado fue **200** para el vigente y **401** con `WWW-Authenticate: Bearer` para el caducado.
 
-```http
-GET /tasks?project_id=3&skip=0&limit=1
-GET /tasks?project_id=3&skip=1&limit=1
-```
+La duración entre emisión y expiración del token original fue de **1800 segundos**.
 
-**Resultado esperado:** cada página contiene como máximo un resultado y `total` refleja las tareas del proyecto que cumplen el filtro.
+![Prueba de caducidad](capturas/07_caducidad.png)
 
-**Captura 10:** filtro por proyecto y estado.
+### Rotación y reutilización de refresh
 
-<!-- INSERTAR CAPTURA 10 AQUÍ -->
+En la prueba se renovó el refresh original, se reutilizó el anterior y después se presentó el nuevo de la misma familia. Las respuestas de los dos últimos pasos fueron **401**, coherentes con la revocación de la familia.
 
-**Capturas 11 y 12:** primera y segunda página, con los parámetros y la respuesta visibles.
+Estas capturas muestran las respuestas; los valores de los tokens no se publican.
 
-<!-- INSERTAR CAPTURA 11 AQUÍ -->
+![Respuesta tras reutilizar un refresh](capturas/08_refresh_reutilizado.png)
 
-<!-- INSERTAR CAPTURA 12 AQUÍ -->
+![Respuesta al usar el refresh de la familia revocada](capturas/09_familia_revocada.png)
 
----
+### Registro genérico
 
-### 10.8. Ordenación
+Las dos peticiones de registro repetidas mostraron el mismo estado y mensaje, sin indicar al cliente si el nombre ya estaba registrado.
 
-Con varias tareas creadas, ejecutar:
+![Respuesta genérica de registro](capturas/10_registro_generico.png)
 
-```http
-GET /tasks?sort_by=title&order=asc
-```
+![Respuesta genérica al repetir el registro](capturas/11_registro_repetido.png)
 
-Repetir con:
+### Sal y coste bcrypt
 
-```http
-GET /tasks?sort_by=title&order=desc
-```
+Se registraron dos cuentas de prueba con la misma contraseña. La consulta local comparó las sales sin mostrar los hashes completos: ambas tienen coste **12** y sus sales son diferentes.
 
-**Resultado esperado:** las tareas aparecen ordenadas por título en la dirección indicada.
+![Comparación de sales y costes bcrypt](capturas/12_sal_coste.png)
 
-**Capturas 13 y 14:** resultados con orden ascendente y descendente.
-
-<!-- INSERTAR CAPTURA 13 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 14 AQUÍ -->
-
----
-
-### 10.9. Resumen de proyectos y categorías
-
-Ejecutar:
-
-```http
-GET /projects/summary
-GET /categories/summary
-```
-
-**Resultado esperado:** `200 OK` y una respuesta con:
-
-```json
-{
-  "total": 0,
-  "with_tasks": 0
-}
-```
-
-Los números anteriores son de ejemplo. Los valores reales dependen de los datos guardados.
-
-**Capturas 15 y 16:** respuestas de ambos resúmenes.
-
-<!-- INSERTAR CAPTURA 15 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 16 AQUÍ -->
-
----
-
-### 10.10. Recursos inexistentes
-
-Ejecutar con un ID que no exista:
-
-```http
-GET /tasks/999999
-GET /projects/999999
-GET /categories/999999
-```
-
-**Resultado esperado:** `404 Not Found` y un mensaje que identifica el recurso inexistente.
-
-También se puede comprobar `PUT` y `DELETE` con un ID inexistente para cada recurso.
-
-**Captura 17:** ejemplo de respuesta `404`.
-
-<!-- INSERTAR CAPTURA 17 AQUÍ -->
-
----
-
-### 10.11. Bloqueo al borrar una categoría con tareas
-
-Mientras la categoría `1` tenga una tarea asociada, ejecutar:
-
-```http
-DELETE /categories/1
-```
-
-**Resultado esperado:** `409 Conflict` con el mensaje:
-
-```json
-{
-  "detail": "La categoría tiene tareas asociadas"
-}
-```
-
-**Captura 18:** petición y respuesta `409`.
-
-<!-- INSERTAR CAPTURA 18 AQUÍ -->
-
----
-
-### 10.12. Eliminar una tarea
-
-Crear una tarea adicional para esta prueba y anotar su ID. Después ejecutar:
-
-```http
-DELETE /tasks/{id_de_la_tarea}
-```
-
-**Resultado esperado:** `204 No Content`.
-
-Consultar después esa misma tarea mediante `GET /tasks/{id_de_la_tarea}`.
-
-**Resultado esperado:** `404 Not Found`.
-
-**Capturas 19 y 20:** borrado `204` y consulta posterior `404`.
-
-<!-- INSERTAR CAPTURA 19 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 20 AQUÍ -->
-
----
-
-### 10.13. Borrado de proyecto en cascada
-
-Para esta prueba, crear un proyecto y una tarea asociados exclusivamente a él. Anotar ambos ID.
-
-Ejecutar:
-
-```http
-DELETE /projects/{id_del_proyecto}
-```
-
-**Resultado esperado:** `204 No Content`.
-
-Después consultar la tarea asociada:
-
-```http
-GET /tasks/{id_de_la_tarea}
-```
-
-**Resultado esperado:** `404 Not Found`, porque se ha eliminado junto al proyecto.
-
-**Capturas 21 y 22:** borrado del proyecto y consulta posterior de la tarea.
-
-<!-- INSERTAR CAPTURA 21 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 22 AQUÍ -->
-
----
-
-### 10.14. Eliminar una categoría sin tareas
-
-Crear una categoría sin tareas asociadas y anotar su ID. Después ejecutar:
-
-```http
-DELETE /categories/{id_de_la_categoria}
-```
-
-**Resultado esperado:** `204 No Content`.
-
-Consultar después la misma categoría:
-
-```http
-GET /categories/{id_de_la_categoria}
-```
-
-**Resultado esperado:** `404 Not Found`.
-
-**Capturas 23 y 24:** borrado de la categoría y consulta posterior.
-
-<!-- INSERTAR CAPTURA 23 AQUÍ -->
-
-<!-- INSERTAR CAPTURA 24 AQUÍ -->
-
----
-
-## 11. Colección de Postman
-
-La colección de Postman contiene las 15 peticiones CRUD indicadas en el enunciado:
-
-- Cinco peticiones de tareas.
-- Cinco peticiones de proyectos.
-- Cinco peticiones de categorías.
-
-También incluye las consultas de resumen para proyectos y categorías.
-
-La colección debe ejecutarse con la API arrancada. Los identificadores utilizados en las peticiones deben corresponder a los registros existentes en la base de datos.
-
-**Captura 25:** colección de Postman mostrando las carpetas y las peticiones.
-
-<!-- INSERTAR CAPTURA 25 AQUÍ -->
-
-**Captura 26:** resultado de la ejecución de la colección, si se ha ejecutado desde Postman.
-
-<!-- INSERTAR CAPTURA 26 AQUÍ -->
-
----
