@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Security
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -14,6 +14,7 @@ from app.schemas import (
     ProjectRead,
     ResourceSummary,
 )
+from app.security import get_current_user
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -39,6 +40,7 @@ def get_project_or_404(project_id: int, db: Session) -> Project:
     "/summary",
     response_model=ResourceSummary,
     summary="Resumen de proyectos",
+    dependencies=[Security(get_current_user, scopes=["projects:read"])],
 )
 def project_summary(db: DbSession):
     # Los contadores se calculan en SQLite sin cargar todos los proyectos.
@@ -54,6 +56,7 @@ def project_summary(db: DbSession):
     "",
     response_model=list[ProjectRead],
     summary="Listar proyectos",
+    dependencies=[Security(get_current_user, scopes=["projects:read"])],
 )
 def list_projects(db: DbSession):
     return db.scalars(
@@ -65,6 +68,7 @@ def list_projects(db: DbSession):
     "/{project_id}",
     response_model=ProjectDetail,
     summary="Consultar proyecto",
+    dependencies=[Security(get_current_user, scopes=["projects:read"])],
 )
 def read_project(project_id: int, db: DbSession):
     # selectinload carga las tareas asociadas de forma explícita.
@@ -91,6 +95,7 @@ def read_project(project_id: int, db: DbSession):
     response_model=ProjectRead,
     status_code=201,
     summary="Crear proyecto",
+    dependencies=[Security(get_current_user, scopes=["projects:write"])],
 )
 def create_project(project: ProjectCreate, db: DbSession):
     record = Project(**project.model_dump())
@@ -105,6 +110,7 @@ def create_project(project: ProjectCreate, db: DbSession):
     "/{project_id}",
     response_model=ProjectRead,
     summary="Editar proyecto",
+    dependencies=[Security(get_current_user, scopes=["projects:write"])],
 )
 def update_project(
     project_id: int,
@@ -126,6 +132,7 @@ def update_project(
     "/{project_id}",
     status_code=204,
     summary="Eliminar proyecto",
+    dependencies=[Security(get_current_user, scopes=["projects:write"])],
 )
 def delete_project(project_id: int, db: DbSession):
     record = get_project_or_404(project_id, db)

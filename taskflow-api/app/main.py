@@ -16,6 +16,7 @@ from app.routers.system import router as system_router
 from app.routers.tasks import router as tasks_router
 from app.database import Base, engine
 from app.routers.categories import router as categories_router
+from app.routers.auth import router as auth_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -81,3 +82,4 @@ app.include_router(system_router)
 app.include_router(tasks_router)
 app.include_router(projects_router)
 app.include_router(categories_router)
+app.include_router(auth_router)

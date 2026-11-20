@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Security
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -14,7 +14,7 @@ from app.schemas import (
     CategoryRead,
     ResourceSummary,
 )
-
+from app.security import get_current_user
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -37,6 +37,7 @@ def get_category_or_404(category_id: int, db: Session) -> Category:
     "/summary",
     response_model=ResourceSummary,
     summary="Resumen de categorías",
+    dependencies=[Security(get_current_user, scopes=["categories:read"])],
 )
 def category_summary(db: DbSession):
     # Calculamos el total y cuántas categorías tienen tareas.
@@ -52,6 +53,7 @@ def category_summary(db: DbSession):
     "",
     response_model=list[CategoryRead],
     summary="Listar categorías",
+    dependencies=[Security(get_current_user, scopes=["categories:read"])],
 )
 def list_categories(db: DbSession):
     return db.scalars(
@@ -63,6 +65,7 @@ def list_categories(db: DbSession):
     "/{category_id}",
     response_model=CategoryDetail,
     summary="Consultar categoría",
+    dependencies=[Security(get_current_user, scopes=["categories:read"])],
 )
 def read_category(category_id: int, db: DbSession):
     # El detalle carga también las tareas relacionadas.
@@ -88,6 +91,7 @@ def read_category(category_id: int, db: DbSession):
     response_model=CategoryRead,
     status_code=201,
     summary="Crear categoría",
+    dependencies=[Security(get_current_user, scopes=["categories:write"])],
 )
 def create_category(category: CategoryCreate, db: DbSession):
     record = Category(**category.model_dump())
@@ -102,6 +106,7 @@ def create_category(category: CategoryCreate, db: DbSession):
     "/{category_id}",
     response_model=CategoryRead,
     summary="Editar categoría",
+    dependencies=[Security(get_current_user, scopes=["categories:write"])],
 )
 def update_category(
     category_id: int,
@@ -122,6 +127,7 @@ def update_category(
     "/{category_id}",
     status_code=204,
     summary="Eliminar categoría",
+    dependencies=[Security(get_current_user, scopes=["categories:write"])],
 )
 def delete_category(category_id: int, db: DbSession):
     # El DELETE exige que la categoría no tenga tareas.

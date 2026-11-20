@@ -2,13 +2,14 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, Security
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Category, Project, Task
 from app.schemas import TaskCreate, TaskPage, TaskRead, TaskUpdate
+from app.security import get_current_user
 
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -54,6 +55,7 @@ def validate_task_references(
     "",
     response_model=TaskPage,
     summary="Listar tareas",
+    dependencies=[Security(get_current_user, scopes=["tasks:read"])],
 )
 def list_tasks(
     db: DbSession,
@@ -106,6 +108,7 @@ def list_tasks(
     "/{task_id}",
     response_model=TaskRead,
     summary="Consultar tarea",
+    dependencies=[Security(get_current_user, scopes=["tasks:read"])],
 )
 def read_task(task_id: int, db: DbSession):
     return get_task_or_404(task_id, db)
@@ -116,6 +119,7 @@ def read_task(task_id: int, db: DbSession):
     response_model=TaskRead,
     status_code=201,
     summary="Crear tarea",
+    dependencies=[Security(get_current_user, scopes=["tasks:write"])],
 )
 def create_task(
     task: Annotated[TaskCreate, Depends(validate_task_references)],
@@ -135,6 +139,7 @@ def create_task(
     "/{task_id}",
     response_model=TaskRead,
     summary="Editar tarea",
+    dependencies=[Security(get_current_user, scopes=["tasks:write"])],
 )
 def update_task(
     task_id: int,
@@ -159,6 +164,7 @@ def update_task(
     "/{task_id}",
     status_code=204,
     summary="Eliminar tarea",
+    dependencies=[Security(get_current_user, scopes=["tasks:write"])],
 )
 def delete_task(task_id: int, db: DbSession):
     record = get_task_or_404(task_id, db)

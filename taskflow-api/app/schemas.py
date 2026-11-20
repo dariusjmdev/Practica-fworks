@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TaskCreate(BaseModel):
@@ -88,3 +88,49 @@ class ResourceSummary(BaseModel):
 
     total: int
     with_tasks: int
+
+class UserCreate(BaseModel):
+    """Datos públicos para registrar una cuenta."""
+
+    # Rechaza campos adicionales, como un role enviado por el cliente.
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        """Evita entradas que bcrypt truncaría o no puede procesar."""
+        if len(value.encode("utf-8")) > 72 or "\x00" in value:
+            raise ValueError(
+                "La contraseña debe ocupar entre 1 y 72 bytes válidos"
+            )
+
+        return value
+
+
+class RegistrationResponse(BaseModel):
+    """Respuesta común para un nombre nuevo o ya utilizado."""
+
+    message: str
+
+
+class TokenResponse(BaseModel):
+    """Par de tokens devuelto al iniciar sesión o renovar."""
+
+    access_token: str
+    token_type: str = "bearer"
+    refresh_token: str
+
+    # Duración del access token en segundos.
+    expires_in: int
+
+    # Permisos concedidos, separados por espacios.
+    scope: str
+
+
+class RefreshRequest(BaseModel):
+    """Cuerpo recibido por el endpoint de renovación."""
+
+    refresh_token: str = Field(min_length=1, max_length=200)

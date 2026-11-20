@@ -91,3 +91,47 @@ class Task(Base):
     # Cada una apunta al atributo tasks del modelo correspondiente.
     project: Mapped[Project | None] = relationship(back_populates="tasks")
     category: Mapped[Category | None] = relationship(back_populates="tasks")
+class UserRole(Base):
+    """Guarda el rol de una cuenta en una tabla independiente."""
+
+    __tablename__ = "user_roles"
+
+    # Cada usuario tiene como máximo una asignación de rol.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    role: Mapped[str] = mapped_column(String, default="member")
+
+
+class RefreshToken(Base):
+    """Guarda el estado de los tokens de renovación."""
+
+    __tablename__ = "refresh_tokens"
+
+    # Se almacena la huella SHA-256 del secreto.
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+
+    # Agrupa los tokens procedentes del mismo inicio de sesión.
+    family_id: Mapped[str] = mapped_column(
+        String(36),
+        index=True,
+    )
+
+    scopes: Mapped[str] = mapped_column(Text)
+
+    # Fecha UTC sin zona para trabajar con SQLite.
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+    consumed: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
